@@ -91,8 +91,12 @@ class RequestContext implements Context {
         return getPayloadChainId(this.request) ?? this.sendOverrides?.chainId ?? this._chainId
     }
 
+    get site() {
+        return this.requestOptions?.site
+    }
+
     get providerType() {
-        return this.sendOverrides?.providerType ?? this._providerType
+        return this.requestOptions?.providerType ?? this._providerType
     }
 
     get method() {

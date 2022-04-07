@@ -1,6 +1,8 @@
 /* eslint @dimensiondev/unicode-specific-set: ["error", { "only": "code" }] */
 import type React from 'react'
 import type { Option, Result } from 'ts-results'
+import type { TransactionConfig } from 'web3-core'
+import type { JsonRpcPayload, JsonRpcResponse } from 'web3-core-helpers'
 import type { TypedMessage } from '@masknet/typed-message'
 import type { ScopedStorage, ProfileIdentifier, PersonaIdentifier } from '@masknet/shared-base'
 import type { Emitter } from '@servie/events'
@@ -61,14 +63,39 @@ export declare namespace Plugin {
  */
 export namespace Plugin.Shared {
     export interface SharedContext {
-        /**
-         * A lightweight K/V storage used to store some simple data.
-         */
+        /** A lightweight K/V storage used to store some simple data. */
         createKVStorage<T extends object>(type: 'memory' | 'persistent', defaultValues: T): ScopedStorage<T>
+
         /** Sign a message with persona */
-        personaSign(payload: PersonaSignRequest): Promise<PersonaSignResult>
-        /** Sign a message with wallet */
-        walletSign(message: string, address: string): Promise<string>
+        personaSignMessage(payload: PersonaSignRequest): Promise<PersonaSignResult>
+
+        /** Native platform type */
+        nativeType: 'Android' | 'iOS'
+        /** Native API supported */
+        hasNativeAPI: boolean
+        /** iOS Ethereum send request */
+        nativeSend(payload: JsonRpcPayload): Promise<JsonRpcResponse>
+        /** Android Ethereum send request */
+        nativeSendJsonString(message: string): Promise<JsonRpcResponse>
+
+        /** Open popup window */
+        openPopupWindow(): Promise<void>
+        /** Close popup window */
+        closePopupWindow(): Promise<void>
+
+        /** Get all wallets */
+        getWallets(): Promise<unknown[]>
+        /** Sign transaction */
+        signTransaction(transaction: TransactionConfig): Promise<string>
+        /** Sign message */
+        signMessage(message: string, address: string): Promise<string>
+        /** Sign typed data */
+        signTypedData(message: string, address: string): Promise<string>
+
+        /** get the latest unconfirmed request */
+        shiftUnconfirmedRequest(): Promise<JsonRpcPayload>
+        /** add an unconfirmed request */
+        pushUnconfirmedRequest(payload: JsonRpcPayload): Promise<JsonRpcPayload>
     }
     export interface Definition {
         /**

@@ -1,10 +1,11 @@
 import Web3 from 'web3'
 import type { HttpProvider, RequestArguments } from 'web3-core'
 import type { JsonRpcResponse } from 'web3-core-helpers'
+import { ExtensionSite } from '@masknet/shared-base'
 import { ChainId, createExternalProvider, createPayload, getChainRPC, getRPCConstants } from '@masknet/web3-shared-evm'
 import { BaseProvider } from './Base'
 import type { Provider, ProviderOptions, Web3Options } from '../types'
-import { currentChainIdSettings } from '../../../../plugins/Wallet/settings'
+import { AccountState } from '../../../state'
 
 const WEIGHTS_LENGTH = getRPCConstants(ChainId.Mainnet).RPC_WEIGHTS?.length ?? 4
 
@@ -55,8 +56,9 @@ export class MaskWalletProvider extends BaseProvider implements Provider {
         return web3
     }
 
-    async createProvider({ chainId, url }: ProviderOptions = {}) {
-        url = url ?? getChainRPC(chainId ?? currentChainIdSettings.value, this.seed)
+    async createProvider({ chainId, url, site = ExtensionSite.Popup }: ProviderOptions = {}) {
+        const { chainId: defaultChainId } = await new AccountState().getAccount(site)
+        url = url ?? getChainRPC(chainId ?? defaultChainId, this.seed)
         if (!url) throw new Error('Failed to create provider.')
         return this.createProviderInstance(url)
     }

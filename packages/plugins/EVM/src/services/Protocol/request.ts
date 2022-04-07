@@ -13,6 +13,7 @@ import { Translator } from './middleware/Translator'
 import { RecentTransaction } from './middleware/Transaction'
 import { TransactionNotifier } from './middleware/TransactionNotifier'
 import { TransactionWatcher } from './middleware/TransactionWatcher'
+import { ExtensionSite } from '@masknet/shared-base'
 
 use(new Squash())
 use(new Nonce())
@@ -49,6 +50,7 @@ export async function request<T extends unknown>(
 ) {
     return new Promise<T>(async (resolve, reject) => {
         const context = createContext(requestArguments, overrides, {
+            site: ExtensionSite.Popup,
             popupsWindow: true,
             ...options,
         })

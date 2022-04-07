@@ -67,20 +67,29 @@ export async function notifyEvent(providerType: ProviderType, name: string, even
 
 export async function connect({ chainId, providerType }: { chainId: ChainId; providerType: ProviderType }) {
     const account = first(
-        await requestAccounts(chainId, {
+        await requestAccounts(
             chainId,
-            providerType,
-        }),
+            {
+                chainId,
+            },
+            {
+                providerType,
+            },
+        ),
     )
 
     // the WalletConnect client-side needs more time to sync chain id changing
     if (providerType === ProviderType.WalletConnect) await delay(1000)
 
     const actualChainId = Number.parseInt(
-        await getChainId({
-            chainId,
-            providerType,
-        }),
+        await getChainId(
+            {
+                chainId,
+            },
+            {
+                providerType,
+            },
+        ),
         16,
     )
 
@@ -91,7 +100,10 @@ export async function connect({ chainId, providerType }: { chainId: ChainId; pro
 }
 
 export async function disconnect({ providerType }: { providerType: ProviderType }) {
-    await dismissAccounts({
-        providerType,
-    })
+    await dismissAccounts(
+        {},
+        {
+            providerType,
+        },
+    )
 }

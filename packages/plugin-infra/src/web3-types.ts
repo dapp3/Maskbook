@@ -332,6 +332,7 @@ export declare namespace Web3Plugin {
 
     export namespace ObjectCapabilities {
         export interface AccountState {
+            getAccount?: (site: EnhanceableSite | ExtensionSite) => Promise<unknown>
             updateAccount?: <T>(site: EnhanceableSite | ExtensionSite, options: Partial<T>) => Promise<void>
             resetAccount?: (site: EnhanceableSite | ExtensionSite) => Promise<void>
         }
@@ -357,17 +358,17 @@ export declare namespace Web3Plugin {
             lookup?: (chainId: number, domain: string) => Promise<string | undefined>
             reverse?: (chainId: number, address: string) => Promise<string | undefined>
         }
-        export interface TokenState {
-            addToken?: (token: Token) => Promise<void>
-            removeToken?: (token: Token) => Promise<void>
-            trustToken?: (address: string, token: Token) => Promise<void>
-            blockToken?: (address: string, token: Token) => Promise<void>
-        }
         export interface TokenListState {
             /** Get the token lists of supported fungible tokens. */
             getFungibleTokenLists?: (chainId: number) => Promise<TokenList>
             /** Get the token lists of supported non-fungible tokens. */
             getNonFungibleTokenLists?: (chainId: number) => Promise<TokenList>
+        }
+        export interface TokenState {
+            addToken?: (token: Token) => Promise<void>
+            removeToken?: (token: Token) => Promise<void>
+            trustToken?: (address: string, token: Token) => Promise<void>
+            blockToken?: (address: string, token: Token) => Promise<void>
         }
         export interface TransactionState {
             getTransaction?: (chainId: number, address: string, id: string) => Promise<RecentTransaction | null>
@@ -390,7 +391,19 @@ export declare namespace Web3Plugin {
             /** clear all transactions relate to account under given chain */
             clearTransactions?: (chainId: number, address: string) => Promise<void>
         }
-
+        export interface ProtocolState {
+            request?: <T extends unknown>(requestArguments: unknown) => Promise<T>
+            /** Sign a plain message, some chain support multiple sign methods */
+            signMessage?: (address: string, message: string, password?: string, signType?: string) => Promise<string>
+            /** Sign a transaction, and the result could send as a raw transaction */
+            signTransaction?: (address: string, transaction: unknown) => Promise<string>
+            /** Send transaction and never mind the result */
+            sendTransactions?: (transaction: unknown) => Promise<void>
+            /** Replace a transaction */
+            replaceTransaction?: (transaction: unknown) => Promise<void>
+            /** Send transaction and wait until it confirmed */
+            sendAndConfirmTransactions?: (transaction: unknown) => Promise<string>
+        }
         export interface WalletState {
             addWallet?: (chainId: number, id: string, wallet: Wallet) => Promise<void>
             removeWallet?: (chainId: number, id: string) => Promise<void>
@@ -465,6 +478,7 @@ export declare namespace Web3Plugin {
             Token?: TokenState
             TokenList?: TokenListState
             Transaction?: TransactionState
+            Protocol?: ProtocolState
             Shared?: SharedState
             Utils?: Others
         }

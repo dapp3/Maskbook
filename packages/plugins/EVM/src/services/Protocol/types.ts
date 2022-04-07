@@ -10,10 +10,12 @@ import type {
     EthereumTransactionConfig,
     EthereumMethodType,
 } from '@masknet/web3-shared-evm'
+import type { EnhanceableSite, ExtensionSite } from '@masknet/shared-base'
 
 export interface ProviderOptions {
     chainId?: ChainId
     url?: string
+    site?: EnhanceableSite | ExtensionSite
 }
 
 export interface Web3Options {

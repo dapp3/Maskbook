@@ -1,12 +1,12 @@
 import './plugins'
 
+import i18n from 'i18next'
 import { Emitter } from '@servie/events'
 import { startPluginDashboard, Plugin } from '@masknet/plugin-infra'
-import { Services, Messages } from '../API'
 import { createI18NBundle } from '@masknet/shared-base'
-import i18n from 'i18next'
-import { InMemoryStorages, PersistentStorages } from '../utils/kv-storage'
 import { EVM_RPC } from '@masknet/plugin-evm/src/messages'
+import { Services, Messages } from '../API'
+import { InMemoryStorages, PersistentStorages } from '../utils/kv-storage'
 
 const PluginHost: Plugin.__Host.Host<Plugin.Dashboard.DashboardContext> = {
     minimalMode: {
@@ -24,6 +24,7 @@ const PluginHost: Plugin.__Host.Host<Plugin.Dashboard.DashboardContext> = {
                 if (type === 'memory') return InMemoryStorages.Plugin.createSubScope(pluginID, defaultValues, signal)
                 else return PersistentStorages.Plugin.createSubScope(pluginID, defaultValues, signal)
             },
+            openPopupWindow: Services.Helper.openPopupWindow,
             personaSign: Services.Identity.signWithPersona,
             walletSign: EVM_RPC.personalSign,
         }

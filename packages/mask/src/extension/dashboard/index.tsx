@@ -7,6 +7,7 @@ import { PluginTraderMessages, PluginTraderRPC } from '../../plugins/Trader/mess
 import { PluginPetMessages } from '../../plugins/Pets/messages'
 import { MaskMessages } from '../../utils/messages'
 import { startPluginDashboard } from '@masknet/plugin-infra'
+import { EVM_RPC } from '@masknet/plugin-evm/src/messages'
 import { createPluginHost } from '../../plugin-infra/host'
 import type { DashboardPluginMessages, DashboardPluginServices } from '@masknet/shared'
 import { createNormalReactRoot } from '../../utils/createNormalReactRoot'

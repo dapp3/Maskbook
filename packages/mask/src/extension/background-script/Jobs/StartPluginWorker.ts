@@ -1,8 +1,10 @@
+import { EVM_RPC } from '@masknet/plugin-evm/src/messages'
 import { startPluginWorker, Plugin } from '@masknet/plugin-infra'
 import { InMemoryStorages, PersistentStorages } from '../../../../shared'
 import { createPluginDatabase } from '../../../database/Plugin'
 import { createPluginHost } from '../../../plugin-infra/host'
 import { Services } from '../../service'
+
 export default function (signal: AbortSignal) {
     startPluginWorker(createPluginHost(signal, createWorkerContext))
 }

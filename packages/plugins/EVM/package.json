@@ -17,6 +17,7 @@
     "@masknet/web3-shared-evm": "workspace:*",
     "@metamask/eth-sig-util": "^4.0.0",
     "bignumber.js": "^9.0.2",
+    "ethjs-ens": "^2.0.1",
     "ethereumjs-util": "^7.1.0",
     "react-use": "^17.3.2",
     "wallet.ts": "^1.0.1",

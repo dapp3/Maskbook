@@ -1,4 +1,5 @@
 import { startPluginDashboard } from '@masknet/plugin-infra'
+import { EVM_RPC } from '@masknet/plugin-evm/src/messages'
 import { createNormalReactRoot } from '../../utils'
 import { createPluginHost } from '../../plugin-infra/host'
 import { Services } from '../service'

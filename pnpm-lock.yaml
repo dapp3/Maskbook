@@ -606,6 +606,7 @@ importers:
       react-use: ^17.3.2
       unstated-next: ^1.1.0
       use-subscription: ^1.6.0
+      web3-core-helpers: 1.5.2
     dependencies:
       '@dimensiondev/holoflows-kit': 0.9.0-20210902104757-7c3d0d0
       '@masknet/encryption': link:../encryption
@@ -621,6 +622,7 @@ importers:
       react-use: 17.3.2_react-dom@18.0.0+react@18.0.0
       unstated-next: 1.1.0
       use-subscription: 1.6.0_react@18.0.0
+      web3-core-helpers: 1.5.2
     devDependencies:
       react-i18next: 11.16.2_67d9cd14f543534febc666d787b5936c
 

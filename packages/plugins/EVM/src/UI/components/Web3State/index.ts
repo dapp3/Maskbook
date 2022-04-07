@@ -1,4 +1,4 @@
-import type { Web3Plugin } from '@masknet/plugin-infra'
+import type { Plugin, Web3Plugin } from '@masknet/plugin-infra'
 import {
     AddressBookState,
     AssetState,
@@ -11,7 +11,10 @@ import {
     UtilState,
 } from '../../../state'
 
-export async function createWeb3State(signal: AbortSignal): Promise<Web3Plugin.ObjectCapabilities.Capabilities> {
+export async function createWeb3State(
+    signal: AbortSignal,
+    context: Plugin.SNSAdaptor.SNSAdaptorContext,
+): Promise<Web3Plugin.ObjectCapabilities.Capabilities> {
     return {
         Account: new AccountState(),
         AddressBook: new AddressBookState(),

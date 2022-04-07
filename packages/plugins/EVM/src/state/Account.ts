@@ -6,19 +6,17 @@ import {
     ChainId,
     NetworkType,
     ProviderType,
+    ChainOptions,
 } from '@masknet/web3-shared-evm'
 import { getStorageValue, setStorageValue } from '../storage'
 
 export class AccountState implements Web3Plugin.ObjectCapabilities.AccountState {
-    async updateAccount(
-        site: EnhanceableSite | ExtensionSite,
-        options: {
-            account?: string
-            chainId?: ChainId
-            networkType?: NetworkType
-            providerType?: ProviderType
-        },
-    ) {
+    async getAccount(site: EnhanceableSite | ExtensionSite) {
+        const chainOptions = await getStorageValue('memory', 'chainOptions')
+        return chainOptions[site]
+    }
+
+    async updateAccount(site: EnhanceableSite | ExtensionSite, options: Partial<ChainOptions>) {
         if (options.chainId && !options.networkType) options.networkType = getNetworkTypeFromChainId(options.chainId)
         if (!options.chainId && options.networkType) options.chainId = getChainIdFromNetworkType(options.networkType)
 

@@ -11,7 +11,7 @@ const sns: Plugin.SNSAdaptor.Definition = {
         setupStorage('memory', context.createKVStorage('memory', MemoryDefaultValue))
         setupStorage('persistent', context.createKVStorage('persistent', PersistentDefaultValue))
 
-        sns.Web3State = await createWeb3State(signal)
+        sns.Web3State = await createWeb3State(signal, context)
     },
     Web3UI,
     GlobalInjection,

@@ -33,11 +33,16 @@ class NonceManager {
                     this.lock()
                     callback(
                         null,
-                        await getTransactionCount(this.address, {
-                            // Only mask wallets need to use Nonce
-                            providerType: ProviderType.MaskWallet,
-                            chainId: currentMaskWalletChainIdSettings.value,
-                        }),
+                        await getTransactionCount(
+                            this.address,
+                            {
+                                chainId: currentMaskWalletChainIdSettings.value,
+                            },
+                            {
+                                // Only mask wallets need to use Nonce
+                                providerType: ProviderType.MaskWallet,
+                            },
+                        ),
                     )
                 } catch (error: unknown) {
                     callback(error instanceof Error ? error : new Error('Failed to get remote nonce.'))
