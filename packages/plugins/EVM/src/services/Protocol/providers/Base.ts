@@ -3,7 +3,6 @@ import type { RequestArguments } from 'web3-core'
 import { first } from 'lodash-unified'
 import { ChainId, createExternalProvider, ProviderType } from '@masknet/web3-shared-evm'
 import type { Provider } from '../types'
-import { currentChainIdSettings, currentProviderSettings } from '../../../../plugins/Wallet/settings'
 import { AccountState } from '../../../state'
 
 export class BaseProvider implements Provider {
@@ -33,7 +32,7 @@ export class BaseProvider implements Provider {
 
     async onAccountsChanged(accounts: string[]) {
         if (currentProviderSettings.value !== this.providerType) return
-        await this.accountState.updateAccount({
+        await this.accountState.updateAccount(this.site, {
             account: first(accounts),
             providerType: this.providerType,
         })
@@ -45,13 +44,13 @@ export class BaseProvider implements Provider {
         // learn more: https://docs.metamask.io/guide/ethereum-provider.html#chain-ids and https://chainid.network/
         const chainId = Number.parseInt(id, 16) || ChainId.Mainnet
         if (currentChainIdSettings.value === chainId) return
-        await this.accountState.updateAccount({
+        await this.accountState.updateAccount(this.site, {
             chainId,
         })
     }
 
     async onDisconnect() {
         if (currentProviderSettings.value !== this.providerType) return
-        await this.accountState.resetAccount()
+        await this.accountState.resetAccount(this.site)
     }
 }

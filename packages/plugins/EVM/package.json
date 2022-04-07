@@ -17,14 +17,14 @@
     "@masknet/web3-shared-evm": "workspace:*",
     "@metamask/eth-sig-util": "^4.0.0",
     "bignumber.js": "^9.0.2",
-    "ethjs-ens": "^2.0.1",
     "ethereumjs-util": "^7.1.0",
+    "ethjs-ens": "^2.0.1",
     "react-use": "^17.3.2",
     "wallet.ts": "^1.0.1",
     "web3": "1.5.2",
     "web3-core": "1.5.2",
     "web3-core-helpers": "1.5.2",
     "web3-eth-abi": "1.5.2",
-    "web3-utils": "^1.7.1"
+    "web3-utils": "1.5.2"
   }
 }

@@ -9,13 +9,13 @@ import {
     EthereumMethodType,
     EthereumTransactionConfig,
 } from '@masknet/web3-shared-evm'
-import {
-    currentAccountSettings,
-    currentChainIdSettings,
-    currentMaskWalletAccountSettings,
-    currentMaskWalletChainIdSettings,
-    currentProviderSettings,
-} from '../../../plugins/Wallet/settings'
+// import {
+//     currentAccountSettings,
+//     currentChainIdSettings,
+//     currentMaskWalletAccountSettings,
+//     currentMaskWalletChainIdSettings,
+//     currentProviderSettings,
+// } from '../../../plugins/Wallet/settings'
 import { getError, hasError } from './error'
 import type { Context, Middleware } from './types'
 

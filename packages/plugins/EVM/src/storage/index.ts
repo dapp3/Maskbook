@@ -23,7 +23,6 @@ export const MemoryDefaultValue: MemoryStorage = {
 }
 
 export const PersistentDefaultValue: PersistentStorage = {
-    wallets: EMPTY_LIST,
     transactions: EMPTY_OBJECT,
     fungibleTokens: EMPTY_LIST,
     nonFungibleTokens: EMPTY_LIST,

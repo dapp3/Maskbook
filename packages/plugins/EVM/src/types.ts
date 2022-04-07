@@ -1,6 +1,5 @@
 import type { Web3Plugin } from '@masknet/plugin-infra'
 import type { EnhanceableSite, ExtensionSite } from '@masknet/shared-base'
-import type { MaskBaseAPI } from '@masknet/web3-providers'
 import type {
     ChainOptions,
     CryptoPrice,
@@ -23,17 +22,6 @@ export interface MemoryStorage {
 }
 
 export interface PersistentStorage {
-    /** list of wallets */
-    wallets: (Web3Plugin.Wallet & {
-        /** yep: removable, nope: unremovable */
-        configurable?: boolean
-        /** the derivation path when wallet was created */
-        derivationPath?: string
-        /** the derivation path when wallet last was derived */
-        latestDerivationPath?: string
-        /** the Mask SDK stored key info */
-        storedKeyInfo?: MaskBaseAPI.StoredKeyInfo
-    })[]
     /** list of transactions owned by accounts */
     transactions: {
         /** chain id + account */

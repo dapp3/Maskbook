@@ -66,9 +66,6 @@ export namespace Plugin.Shared {
         /** A lightweight K/V storage used to store some simple data. */
         createKVStorage<T extends object>(type: 'memory' | 'persistent', defaultValues: T): ScopedStorage<T>
 
-        /** Sign a message with persona */
-        personaSignMessage(payload: PersonaSignRequest): Promise<PersonaSignResult>
-
         /** Native platform type */
         nativeType: 'Android' | 'iOS'
         /** Native API supported */
@@ -84,13 +81,24 @@ export namespace Plugin.Shared {
         closePopupWindow(): Promise<void>
 
         /** Get all wallets */
-        getWallets(): Promise<unknown[]>
+        wallets: Subscription<Web3Plugin.Wallet[]>
+        /** Get all personas */
+        personas: Subscription<PersonaIdentifier[]>
+
+        /** Add a new wallet */
+        addWallet(id: string, wallet: Web3Plugin.Wallet): Promise<void>
+        /** Remove a old wallet */
+        removeWallet(id: string): Promise<void>
+
+        /** Sign a message with persona */
+        personaSignMessage(payload: PersonaSignRequest): Promise<PersonaSignResult>
+
         /** Sign transaction */
-        signTransaction(transaction: TransactionConfig): Promise<string>
+        signTransaction(address: string, transaction: TransactionConfig): Promise<string>
         /** Sign message */
-        signMessage(message: string, address: string): Promise<string>
+        signMessage(address: string, message: string): Promise<string>
         /** Sign typed data */
-        signTypedData(message: string, address: string): Promise<string>
+        signTypedData(address: string, message: string): Promise<string>
 
         /** get the latest unconfirmed request */
         shiftUnconfirmedRequest(): Promise<JsonRpcPayload>

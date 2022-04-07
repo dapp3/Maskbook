@@ -712,13 +712,14 @@ importers:
       '@metamask/eth-sig-util': ^4.0.0
       bignumber.js: ^9.0.2
       ethereumjs-util: ^7.1.0
+      ethjs-ens: ^2.0.1
       react-use: ^17.3.2
       wallet.ts: ^1.0.1
       web3: 1.5.2
       web3-core: 1.5.2
       web3-core-helpers: 1.5.2
       web3-eth-abi: 1.5.2
-      web3-utils: ^1.7.1
+      web3-utils: 1.5.2
     dependencies:
       '@dimensiondev/metamask-extension-provider': 3.0.6-20210519045409-1835d4d
       '@masknet/icons': link:../../icons
@@ -734,13 +735,14 @@ importers:
       '@metamask/eth-sig-util': 4.0.0
       bignumber.js: 9.0.2
       ethereumjs-util: 7.1.4
+      ethjs-ens: 2.0.1
       react-use: 17.3.2_react-dom@18.0.0+react@18.0.0
       wallet.ts: 1.0.1
       web3: 1.5.2
       web3-core: 1.5.2
       web3-core-helpers: 1.5.2
       web3-eth-abi: 1.5.2
-      web3-utils: 1.7.1
+      web3-utils: 1.5.2
 
   packages/plugins/FileService:
     specifiers:
@@ -26893,19 +26895,6 @@ packages:
       bn.js: 4.12.0
       eth-lib: 0.2.8
       ethereum-bloom-filters: 1.0.10
-      ethjs-unit: 0.1.6
-      number-to-bn: 1.7.0
-      randombytes: 2.1.0
-      utf8: 3.0.0
-    dev: false
-
-  /web3-utils/1.7.1:
-    resolution: {integrity: sha512-fef0EsqMGJUgiHPdX+KN9okVWshbIumyJPmR+btnD1HgvoXijKEkuKBv0OmUqjbeqmLKP2/N9EiXKJel5+E1Dw==}
-    engines: {node: '>=8.0.0'}
-    dependencies:
-      bn.js: 4.12.0
-      ethereum-bloom-filters: 1.0.10
-      ethereumjs-util: 7.1.4
       ethjs-unit: 0.1.6
       number-to-bn: 1.7.0
       randombytes: 2.1.0

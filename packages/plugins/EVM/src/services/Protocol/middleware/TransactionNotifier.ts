@@ -1,6 +1,5 @@
 import type { Transaction, TransactionReceipt } from 'web3-core'
 import type { JsonRpcPayload } from 'web3-core-helpers'
-import { WalletMessages } from '@masknet/plugin-wallet'
 import {
     EthereumMethodType,
     getPayloadSignature,
@@ -39,7 +38,7 @@ class ProgressManager {
         if (!progress) return
 
         progress.state = state
-        WalletMessages.events.transactionProgressUpdated.sendToAll(progress)
+        // WalletMessages.events.transactionProgressUpdated.sendToAll(progress)
 
         // stop watch progress
         if (isFinalState(progress.state.type)) this.removeProgress(progressId)

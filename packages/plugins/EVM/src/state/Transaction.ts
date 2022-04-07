@@ -2,7 +2,7 @@ import { TransactionStatusType, Web3Plugin } from '@masknet/plugin-infra'
 import { ChainId, EthereumTransactionConfig, formatEthereumAddress } from '@masknet/web3-shared-evm'
 import { getStorageValue, setStorageValue } from '../storage'
 
-export class TransactionState implements Web3Plugin.ObjectCapabilities.TransactionState {
+export class TransactionState implements Web3Plugin.ObjectCapabilities.TransactionState<EthereumTransactionConfig> {
     static MAX_RECORD_SIZE = 20
 
     private getRecordKey(chainId: ChainId, address: string) {
@@ -10,7 +10,7 @@ export class TransactionState implements Web3Plugin.ObjectCapabilities.Transacti
     }
 
     private currySameTransaction(id: string, negative = false) {
-        return (transaction: { candidates: Record<string, unknown> }) => {
+        return (transaction: { candidates: Record<string, EthereumTransactionConfig> }) => {
             const included = Object.keys(transaction.candidates).includes(id)
             return negative ? !included : included
         }
@@ -27,7 +27,7 @@ export class TransactionState implements Web3Plugin.ObjectCapabilities.Transacti
         return transactions[key] ?? []
     }
 
-    async addTransaction(chainId: ChainId, address: string, id: string, config: unknown) {
+    async addTransaction(chainId: ChainId, address: string, id: string, config: EthereumTransactionConfig) {
         const now = new Date()
         const key = this.getRecordKey(chainId, address)
         const all = await getStorageValue('persistent', 'transactions')
@@ -57,7 +57,13 @@ export class TransactionState implements Web3Plugin.ObjectCapabilities.Transacti
         // EVM message
     }
 
-    async replaceTransaction(chainId: number, address: string, id: string, newId: string, config: unknown) {
+    async replaceTransaction(
+        chainId: ChainId,
+        address: string,
+        id: string,
+        newId: string,
+        config: EthereumTransactionConfig,
+    ) {
         const now = new Date()
         const key = this.getRecordKey(chainId, address)
         const all = await getStorageValue('persistent', 'transactions')
@@ -76,7 +82,7 @@ export class TransactionState implements Web3Plugin.ObjectCapabilities.Transacti
     }
 
     async updateTransaction(
-        chainId: number,
+        chainId: ChainId,
         address: string,
         id: string,
         status: Exclude<TransactionStatusType, TransactionStatusType.NOT_DEPEND>,
@@ -98,7 +104,7 @@ export class TransactionState implements Web3Plugin.ObjectCapabilities.Transacti
         // EVM message
     }
 
-    async removeTransaction(chainId: number, address: string, id: string) {
+    async removeTransaction(chainId: ChainId, address: string, id: string) {
         const key = this.getRecordKey(chainId, address)
         const all = await getStorageValue('persistent', 'transactions')
 
@@ -108,7 +114,7 @@ export class TransactionState implements Web3Plugin.ObjectCapabilities.Transacti
         })
     }
 
-    async clearTransactions(chainId: number, address: string) {
+    async clearTransactions(chainId: ChainId, address: string) {
         const key = this.getRecordKey(chainId, address)
         const all = await getStorageValue('persistent', 'transactions')
 

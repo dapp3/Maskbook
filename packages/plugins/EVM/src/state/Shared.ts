@@ -49,11 +49,11 @@ export class SharedState {
 
             // prices: mapSubscription(getStorageSubscription('memory', 'tokenPrices'), (x) => x),
 
-            wallets: mapSubscription(getStorageSubscription('persistent', 'wallets'), (x) => x),
-            walletPrimary: mapSubscription(
-                getStorageSubscription('persistent', 'wallets'),
-                (x) => x.find((x) => x.storedKeyInfo?.type === Mask.StoredKeyType.Mnemonic) ?? null,
-            ),
+            // wallets: mapSubscription(getStorageSubscription('persistent', 'wallets'), (x) => x),
+            // walletPrimary: mapSubscription(
+            //     getStorageSubscription('persistent', 'wallets'),
+            //     (x) => x.find((x) => x.storedKeyInfo?.type === Mask.StoredKeyType.Mnemonic) ?? null,
+            // ),
 
             fungibleTokens: mapSubscription(
                 mergeSubscription<[string, Web3Plugin.FungibleToken[], Web3Plugin.AddressList]>(

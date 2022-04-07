@@ -13,7 +13,6 @@ import type { JsonRpcPayload } from 'web3-core-helpers'
 import { Explorer } from '@masknet/web3-providers'
 import type { Context, Middleware } from '../types'
 import { getTransactionReceipt } from '../network'
-import { currentChainIdSettings } from '../../../../plugins/Wallet/settings'
 
 interface StorageItem {
     at: number
@@ -160,13 +159,13 @@ class Watcher {
         if (allSettled.every((x) => x.status === 'fulfilled' && x.value)) return
 
         // kick to the next round
-        this.startCheck(true)
+        this.startCheck(chainId)
     }
 
-    private startCheck(force = false) {
-        if (force) this.stopCheck()
+    private startCheck(chainId: ChainId) {
+        this.stopCheck()
         if (this.timer === null) {
-            this.timer = setTimeout(this.check.bind(this, currentChainIdSettings.value), Watcher.CHECK_DELAY)
+            this.timer = setTimeout(this.check.bind(this, chainId), Watcher.CHECK_DELAY)
         }
     }
 
@@ -183,7 +182,7 @@ class Watcher {
                 receipt: Promise.resolve(null),
             })
         }
-        this.startCheck()
+        this.startCheck(chainId)
     }
 
     public unwatchTransaction(chainId: ChainId, hash: string) {
