@@ -1,6 +1,5 @@
 import { Web3Plugin, CurrencyType } from '@masknet/plugin-infra'
 import { ChainId, NetworkType, ProviderType, ChainOptions } from '@masknet/web3-shared-evm'
-import { Mask } from '@masknet/web3-providers'
 import { createConstantSubscription, getSiteType, mapSubscription, mergeSubscription } from '@masknet/shared-base'
 import { getStorageSubscription } from '../storage'
 

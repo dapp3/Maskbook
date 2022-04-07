@@ -1,5 +1,5 @@
-import type { SignedTransaction, Transaction, TransactionConfig, TransactionReceipt } from 'web3-core'
 import { toHex } from 'web3-utils'
+import type { SignedTransaction, Transaction, TransactionConfig, TransactionReceipt } from 'web3-core'
 import {
     ChainId,
     EthereumChainDetailed,

@@ -1,37 +1,58 @@
 import { first } from 'lodash-unified'
 import { delay } from '@dimensiondev/kit'
-import { ChainId, createLookupTableResolver, ProviderType } from '@masknet/web3-shared-evm'
+import { ChainId, ProviderType } from '@masknet/web3-shared-evm'
+import { EnhanceableSite, ExtensionSite } from '@masknet/shared-base'
 import { BridgedProvider } from './providers/Bridged'
 import { MaskWalletProvider } from './providers/MaskWallet'
 import { CustomNetworkProvider } from './providers/CustomNetwork'
 import type { Provider } from './types'
-import { currentChainIdSettings, currentProviderSettings } from '../../../plugins/Wallet/settings'
 import { dismissAccounts, getChainId, requestAccounts } from './network'
 
-const getProvider = createLookupTableResolver<ProviderType, Provider | null>(
-    {
-        [ProviderType.MaskWallet]: new MaskWalletProvider(ProviderType.MaskWallet),
-        [ProviderType.MetaMask]: new BridgedProvider(ProviderType.MetaMask),
-        [ProviderType.WalletConnect]: new BridgedProvider(ProviderType.WalletConnect),
-        [ProviderType.Coin98]: new BridgedProvider(ProviderType.Coin98),
-        [ProviderType.WalletLink]: new BridgedProvider(ProviderType.WalletLink),
-        [ProviderType.MathWallet]: new BridgedProvider(ProviderType.MathWallet),
-        [ProviderType.Fortmatic]: new BridgedProvider(ProviderType.Fortmatic),
-        [ProviderType.CustomNetwork]: new CustomNetworkProvider(),
-    },
-    null,
-)
+const EnhanceableSiteProviders: Record<ProviderType, Provider | null> = {
+    [ProviderType.MaskWallet]: new MaskWalletProvider(ProviderType.MaskWallet),
+    [ProviderType.MetaMask]: new BridgedProvider(ProviderType.MetaMask),
+    [ProviderType.WalletConnect]: new BridgedProvider(ProviderType.WalletConnect),
+    [ProviderType.Coin98]: new BridgedProvider(ProviderType.Coin98),
+    [ProviderType.WalletLink]: new BridgedProvider(ProviderType.WalletLink),
+    [ProviderType.MathWallet]: new BridgedProvider(ProviderType.MathWallet),
+    [ProviderType.Fortmatic]: new BridgedProvider(ProviderType.Fortmatic),
+    [ProviderType.CustomNetwork]: new CustomNetworkProvider(),
+}
+
+const ExtensionSiteProviders: Record<ProviderType, Provider | null> = {
+    [ProviderType.MaskWallet]: new MaskWalletProvider(ProviderType.MaskWallet),
+    [ProviderType.MetaMask]: new BridgedProvider(ProviderType.MetaMask),
+    [ProviderType.WalletConnect]: new BridgedProvider(ProviderType.WalletConnect),
+    [ProviderType.Coin98]: null,
+    [ProviderType.WalletLink]: null,
+    [ProviderType.MathWallet]: null,
+    [ProviderType.Fortmatic]: null,
+    [ProviderType.CustomNetwork]: new CustomNetworkProvider(),
+}
+
+const SiteProviders: Record<EnhanceableSite | ExtensionSite, Record<ProviderType, Provider | null>> = {
+    [EnhanceableSite.Localhost]: EnhanceableSiteProviders,
+    [EnhanceableSite.Facebook]: EnhanceableSiteProviders,
+    [EnhanceableSite.Instagram]: EnhanceableSiteProviders,
+    [EnhanceableSite.Twitter]: EnhanceableSiteProviders,
+    [EnhanceableSite.Minds]: EnhanceableSiteProviders,
+    [EnhanceableSite.OpenSea]: EnhanceableSiteProviders,
+    [ExtensionSite.Dashboard]: ExtensionSiteProviders,
+    [ExtensionSite.Popup]: ExtensionSiteProviders,
+}
 
 export async function createWeb3(
-    chainId = currentChainIdSettings.value,
-    providerType = currentProviderSettings.value,
+    site: EnhanceableSite | ExtensionSite,
+    chainId: ChainId,
+    providerType: ProviderType,
     keys: string[] = [],
 ) {
-    const provider = getProvider(providerType)
+    const provider = SiteProviders[site][providerType]
     return (
         provider?.createWeb3({
             keys,
             options: {
+                site,
                 chainId,
             },
         }) ?? null
@@ -39,16 +60,22 @@ export async function createWeb3(
 }
 
 export async function createExternalProvider(
-    chainId = currentChainIdSettings.value,
-    providerType = currentProviderSettings.value,
+    site: EnhanceableSite | ExtensionSite,
+    chainId: ChainId,
+    providerType: ProviderType,
     url?: string,
 ) {
-    const provider = getProvider(providerType)
-    return provider?.createExternalProvider({ chainId, url })
+    const provider = SiteProviders[site][providerType]
+    return provider?.createExternalProvider({ chainId, url, site })
 }
 
-export async function notifyEvent(providerType: ProviderType, name: string, event?: unknown) {
-    const provider = getProvider(providerType)
+export async function notifyEvent(
+    site: EnhanceableSite | ExtensionSite,
+    providerType: ProviderType,
+    name: string,
+    event?: unknown,
+) {
+    const provider = SiteProviders[site][providerType]
 
     switch (name) {
         case 'accountsChanged':
@@ -78,7 +105,7 @@ export async function connect({ chainId, providerType }: { chainId: ChainId; pro
         ),
     )
 
-    // the WalletConnect client-side needs more time to sync chain id changing
+    // the WalletConnect client-side needs more time on waiting for syncing chain id
     if (providerType === ProviderType.WalletConnect) await delay(1000)
 
     const actualChainId = Number.parseInt(
