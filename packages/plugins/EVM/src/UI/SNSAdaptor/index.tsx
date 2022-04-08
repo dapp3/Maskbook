@@ -1,7 +1,7 @@
 import type { Plugin } from '@masknet/plugin-infra'
 import { base } from '../../base'
 import { Web3UI } from '../components/Web3UI'
-import { createWeb3State } from '../components/Web3State'
+import { setupState } from '../../state'
 import { GlobalInjection } from '../components/GlobalInjection'
 import { MemoryDefaultValue, PersistentDefaultValue, setupStorage } from '../../storage'
 
@@ -11,7 +11,8 @@ const sns: Plugin.SNSAdaptor.Definition = {
         setupStorage('memory', context.createKVStorage('memory', MemoryDefaultValue))
         setupStorage('persistent', context.createKVStorage('persistent', PersistentDefaultValue))
 
-        sns.Web3State = await createWeb3State(signal, context)
+        // @ts-ignore
+        sns.Web3State = await setupState(context)
     },
     Web3UI,
     GlobalInjection,
