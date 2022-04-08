@@ -1,4 +1,5 @@
 export * from './web3'
+export * from './web3-state'
 export * from './types'
 export * from './web3-types'
 export * from './hooks'

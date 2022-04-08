@@ -1,10 +1,10 @@
 import ENS from 'ethjs-ens'
-import type { Web3Plugin } from '@masknet/plugin-infra'
-import { ChainId, createExternalProvider, isSameAddress, isValidAddress, isZeroAddress } from '@masknet/web3-shared-evm'
+import { getEnumAsArray } from '@dimensiondev/kit'
+import { NameServiceState, Plugin } from '@masknet/plugin-infra'
+import { ChainId, createExternalProvider, formatEthereumAddress, isValidAddress, isZeroAddress } from '@masknet/web3-shared-evm'
 import { EVM_RPC } from '../messages'
-import { getStorageValue, setStorageValue } from '../storage'
 
-export class NameServiceState implements Web3Plugin.ObjectCapabilities.NameServiceState {
+export class NameService extends NameServiceState {
     private provider = createExternalProvider(EVM_RPC.request, () => ({
         chainId: ChainId.Mainnet,
     }))
@@ -14,57 +14,36 @@ export class NameServiceState implements Web3Plugin.ObjectCapabilities.NameServi
         network: ChainId.Mainnet,
     })
 
-    static ZERO_X_ERROR_ADDRESS = '0x'
+    constructor(override context: Plugin.Shared.SharedContext) {
+        const defaultValue = getEnumAsArray(ChainId).reduce((accumulator, chainId) => {
+            accumulator[chainId.value] = {}
+            return accumulator
+        }, {} as Record<number, Record<string, string>>)
 
-    private async getDomainBook(chainId: ChainId, addressOrDomain: string) {
-        const domainAddressBook = await getStorageValue('memory', 'domainBook')
-        return domainAddressBook[chainId]?.[addressOrDomain]
-    }
-
-    private async setDomainBook(chainId: ChainId, addressOrDomain: string, domainOrAddress: string) {
-        return setStorageValue('memory', 'domainBook', {
-            [chainId]: {
-                [addressOrDomain]: domainOrAddress,
-                [domainOrAddress]: addressOrDomain,
-            },
+        super(context, defaultValue, {
+            isValidName: (x) => x !== '0x',
+            isValidAddress: (x) => isValidAddress(x) && !isZeroAddress(x),
+            formatAddress: formatEthereumAddress,
         })
     }
 
-    async lookup(chainId: ChainId, domain: string) {
+    override async lookup(chainId: ChainId, name: string) {
         if (chainId !== ChainId.Mainnet) return
 
-        const cachedAddress = await this.getDomainBook(chainId, domain)
-        if (cachedAddress && isValidAddress(cachedAddress)) return cachedAddress
+        const cachedAddress = await super.lookup(chainId, name)
+        if (cachedAddress) return cachedAddress
 
-        const address = await this.ens.lookup(domain)
-
-        if (
-            isZeroAddress(address) ||
-            !isValidAddress(address) ||
-            isSameAddress(address, NameServiceState.ZERO_X_ERROR_ADDRESS)
-        )
-            return
-
-        // set cache
-        if (address) await this.setDomainBook(chainId, domain, address)
-
-        return address
+        await super.addAddress(chainId, name, await this.ens.lookup(name))
+        return super.lookup(chainId, name)
     }
 
-    async reverse(chainId: ChainId, address: string) {
+    override async reverse(chainId: ChainId, address: string) {
         if (chainId !== ChainId.Mainnet) return
-        if (!isValidAddress(address)) return
 
-        const cachedDomain = await this.getDomainBook(chainId, address)
+        const cachedDomain = await super.reverse(chainId, address)
         if (cachedDomain) return cachedDomain
 
-        const domain = await this.ens.reverse(address)
-
-        if (!domain || isZeroAddress(domain) || isSameAddress(domain, NameServiceState.ZERO_X_ERROR_ADDRESS)) return
-
-        // set cache
-        await this.setDomainBook(chainId, address, domain)
-
-        return domain
+        await super.addName(chainId, address, await this.ens.reverse(address))
+        return super.reverse(chainId, address)
     }
 }

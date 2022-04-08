@@ -340,9 +340,9 @@ export declare namespace Web3Plugin {
     }
 
     export namespace ObjectCapabilities {
-        export interface AccountState {
-            getAccount?: (site: EnhanceableSite | ExtensionSite) => Promise<unknown>
-            updateAccount?: <T>(site: EnhanceableSite | ExtensionSite, options: Partial<T>) => Promise<void>
+        export interface AccountState<T> {
+            getAccount?: (site: EnhanceableSite | ExtensionSite) => Promise<T>
+            updateAccount?: (site: EnhanceableSite | ExtensionSite, options: Partial<T>) => Promise<void>
             resetAccount?: (site: EnhanceableSite | ExtensionSite) => Promise<void>
         }
         export interface AddressBookState {
@@ -475,8 +475,13 @@ export declare namespace Web3Plugin {
             resolveFungibleTokenLink?: (chainId: number, address: string) => string
             resolveNonFungibleTokenLink?: (chainId: number, address: string, tokenId: string) => string
         }
-        export interface Capabilities<Payload = unknown, RequestArguments = unknown, TransactionConfig = unknown> {
-            Account?: AccountState
+        export interface Capabilities<
+            Account = unknown,
+            Payload = unknown,
+            RequestArguments = unknown,
+            TransactionConfig = unknown,
+        > {
+            Account?: AccountState<Account>
             AddressBook?: AddressBookState
             Asset?: AssetState
             NameService?: NameServiceState
