@@ -1,19 +1,19 @@
-import { openDB, DBSchema } from 'idb/with-async-ittr'
-import { ECKeyIdentifier, Identifier, PersonaIdentifier, ProfileIdentifier } from '@masknet/shared-base'
-import { createDBAccess, createTransaction, IDBPSafeTransaction } from '../utils/openDB'
+import { openDB, type DBSchema } from 'idb/with-async-ittr'
+import { ECKeyIdentifier, Identifier, type PersonaIdentifier, ProfileIdentifier } from '@masknet/shared-base'
+import { createDBAccess, createTransaction, type IDBPSafeTransaction } from '../utils/openDB.js'
 
 const pendingUpdate = new Map<IdentifierWithAvatar, Partial<AvatarMetadataRecord>>()
 let pendingUpdateTimer: ReturnType<typeof setTimeout> | null
 
 // #region Schema
 export type IdentifierWithAvatar = ProfileIdentifier | PersonaIdentifier
-type AvatarRecord = ArrayBuffer
+type AvatarRecord = ArrayBuffer | string
 interface AvatarMetadataRecord {
     identifier: string
     lastUpdateTime: Date
     lastAccessTime: Date
 }
-export interface AvatarDBSchema extends DBSchema {
+interface AvatarDBSchema extends DBSchema {
     /** Use out-of-line keys */
     avatars: {
         value: AvatarRecord
@@ -41,7 +41,7 @@ export const createAvatarDBAccess = createDBAccess(() => {
 export async function storeAvatarDB(
     t: IDBPSafeTransaction<AvatarDBSchema, ['metadata', 'avatars'], 'readwrite'>,
     id: IdentifierWithAvatar,
-    avatar: ArrayBuffer,
+    avatar: ArrayBuffer | string,
 ): Promise<void> {
     const meta: AvatarMetadataRecord = {
         identifier: id.toText(),
@@ -55,12 +55,19 @@ export async function storeAvatarDB(
  * Read avatar out
  */
 export async function queryAvatarDB(
-    t: IDBPSafeTransaction<AvatarDBSchema, ['avatars'], 'readonly'>,
+    t: IDBPSafeTransaction<AvatarDBSchema, ['avatars']>,
     id: IdentifierWithAvatar,
-): Promise<ArrayBuffer | null> {
+): Promise<AvatarRecord | null> {
     const result = await t.objectStore('avatars').get(id.toText())
     if (result) scheduleAvatarMetaUpdate(id, { lastAccessTime: new Date() })
     return result || null
+}
+
+export async function queryAvatarMetaDataDB(
+    t: IDBPSafeTransaction<AvatarDBSchema, ['metadata']>,
+    id: IdentifierWithAvatar,
+) {
+    return t.objectStore('metadata').get(id.toText())
 }
 function scheduleAvatarMetaUpdate(id: IdentifierWithAvatar, meta: Partial<AvatarMetadataRecord>) {
     pendingUpdate.set(id, meta)
@@ -90,7 +97,7 @@ function scheduleAvatarMetaUpdate(id: IdentifierWithAvatar, meta: Partial<Avatar
  * @internal
  */
 export async function queryAvatarOutdatedDB(
-    t: IDBPSafeTransaction<AvatarDBSchema, ['metadata'], 'readonly'>,
+    t: IDBPSafeTransaction<AvatarDBSchema, ['metadata']>,
     attribute: 'lastUpdateTime' | 'lastAccessTime',
     deadline: Date = new Date(Date.now() - 1000 * 60 * 60 * 24 * (attribute === 'lastAccessTime' ? 14 : 7)),
 ) {
@@ -98,8 +105,8 @@ export async function queryAvatarOutdatedDB(
     for await (const { value } of t.objectStore('metadata')) {
         if (deadline > value[attribute]) {
             const id = Identifier.from(value.identifier)
-            if (id.none) continue
-            if (id.val instanceof ProfileIdentifier || id.val instanceof ECKeyIdentifier) outdated.push(id.val)
+            if (id.isNone()) continue
+            if (id.value instanceof ProfileIdentifier || id.value instanceof ECKeyIdentifier) outdated.push(id.value)
         }
     }
     return outdated
@@ -113,7 +120,7 @@ export async function queryAvatarOutdatedDB(
  * @internal
  */
 export async function isAvatarOutdatedDB(
-    t: IDBPSafeTransaction<AvatarDBSchema, ['metadata'], 'readonly'>,
+    t: IDBPSafeTransaction<AvatarDBSchema, ['metadata']>,
     identifier: IdentifierWithAvatar,
     attribute: 'lastUpdateTime' | 'lastAccessTime',
     deadline: Date = new Date(Date.now() - 1000 * 60 * 60 * 24 * (attribute === 'lastAccessTime' ? 30 : 7)),

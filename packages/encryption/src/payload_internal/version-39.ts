@@ -1,8 +1,8 @@
-/* eslint @dimensiondev/unicode/specific-set: ["error", { "only": "code" }] */
-import { parse40 } from './version-40'
-import { PayloadException } from '../types'
-import type { PayloadParserResult } from '.'
-import { CheckedError } from '@masknet/shared-base'
+/* eslint @masknet/unicode-specific-set: ["error", { "only": "code" }] */
+import { parse40 } from './version-40.js'
+import { PayloadException } from '../types/index.js'
+import type { PayloadParserResult } from './index.js'
+import { CheckedError } from '@masknet/base'
 
 // -39 payload is totally the same as -40.
 // -40 uses unstable JSON stringify in E2E encryption, -39 fixes that.

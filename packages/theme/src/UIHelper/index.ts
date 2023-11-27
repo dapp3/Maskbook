@@ -1,3 +1,3 @@
-export * from './makeStyles'
-export * from './custom-ui-helper'
-export * from './useUserPrefersColorScheme'
+/// <reference path="./custom-ui.d.ts" />
+export * from './makeStyles.js'
+export * from './useUserPrefersColorScheme.js'

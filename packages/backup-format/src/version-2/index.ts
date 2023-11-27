@@ -1,21 +1,20 @@
-import { decodeArrayBuffer, encodeArrayBuffer, safeUnreachable } from '@dimensiondev/kit'
+import { decodeArrayBuffer, encodeArrayBuffer, safeUnreachable } from '@masknet/kit'
 import {
     ECKeyIdentifier,
-    ECKeyIdentifierFromJsonWebKey,
     isAESJsonWebKey,
     isEC_Private_JsonWebKey,
     isEC_Public_JsonWebKey,
     PostIVIdentifier,
     ProfileIdentifier,
-    RelationFavor,
+    type RelationFavor,
 } from '@masknet/shared-base'
 import __ from 'elliptic'
 import { Convert } from 'pvtsutils'
 import { decode, encode } from '@msgpack/msgpack'
-import { None, Some } from 'ts-results'
-import { createEmptyNormalizedBackup } from '../normalize'
-import type { NormalizedBackup } from '../normalize/type'
-import { hex2buffer } from '../utils/hex2buffer'
+import { None, Some } from 'ts-results-es'
+import { createEmptyNormalizedBackup } from '../normalize/index.js'
+import type { NormalizedBackup } from '../normalize/type.js'
+import { hex2buffer } from '../utils/hex2buffer.js'
 
 export function isBackupVersion2(item: unknown): item is BackupJSONFileVersion2 {
     try {
@@ -38,7 +37,7 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
     for (const persona of personas) {
         const { publicKey } = persona
         if (!isEC_Public_JsonWebKey(publicKey)) continue
-        const identifier = await ECKeyIdentifierFromJsonWebKey(publicKey)
+        const identifier = (await ECKeyIdentifier.fromJsonWebKey(publicKey)).unwrap()
         const normalizedPersona: NormalizedBackup.PersonaBackup = {
             identifier,
             linkedProfiles: new Map(),
@@ -49,11 +48,12 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
             updatedAt: Some(new Date(persona.updatedAt)),
             nickname: persona.nickname ? Some(persona.nickname) : None,
             mnemonic: None,
+            address: persona.address ? Some(persona.address) : None,
         }
         for (const [profile] of persona.linkedProfiles) {
             const id = ProfileIdentifier.from(profile)
-            if (id.none) continue
-            normalizedPersona.linkedProfiles.set(id.val, null)
+            if (id.isNone()) continue
+            normalizedPersona.linkedProfiles.set(id.value, null)
         }
         if (persona.mnemonic) {
             const { words, parameter } = persona.mnemonic
@@ -65,16 +65,16 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
 
     for (const profile of profiles) {
         const identifier = ProfileIdentifier.from(profile.identifier)
-        if (identifier.none) continue
+        if (identifier.isNone()) continue
         const normalizedProfile: NormalizedBackup.ProfileBackup = {
-            identifier: identifier.val,
+            identifier: identifier.value,
             createdAt: Some(new Date(profile.createdAt)),
             updatedAt: Some(new Date(profile.updatedAt)),
             nickname: profile.nickname ? Some(profile.nickname) : None,
             linkedPersona: ECKeyIdentifier.from(profile.linkedPersona),
             localKey: isAESJsonWebKey(profile.localKey) ? Some(profile.localKey) : None,
         }
-        backup.profiles.set(identifier.val, normalizedProfile)
+        backup.profiles.set(identifier.value, normalizedProfile)
     }
 
     for (const persona of backup.personas.values()) {
@@ -92,12 +92,12 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
         const postBy = ProfileIdentifier.from(post.postBy)
         const encryptBy = ECKeyIdentifier.from(post.encryptBy)
 
-        if (identifier.none) continue
+        if (identifier.isNone()) continue
         const interestedMeta = new Map<string, any>()
         const normalizedPost: NormalizedBackup.PostBackup = {
-            identifier: identifier.val,
+            identifier: identifier.value,
             foundAt: new Date(post.foundAt),
-            postBy: postBy.unwrapOr(undefined),
+            postBy,
             interestedMeta,
             encryptBy,
             summary: post.summary ? Some(post.summary) : None,
@@ -113,9 +113,9 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
                 const map = new Map<ProfileIdentifier, NormalizedBackup.RecipientReason[]>()
                 for (const [recipient, { reason }] of post.recipients) {
                     const id = ProfileIdentifier.from(recipient)
-                    if (id.none) continue
+                    if (id.isNone()) continue
                     const reasons: NormalizedBackup.RecipientReason[] = []
-                    map.set(id.val, reasons)
+                    map.set(id.value, reasons)
                     for (const r of reason) {
                         // we ignore the original reason because we no longer support group / auto sharing
                         reasons.push({ type: 'direct', at: new Date(r.at) })
@@ -126,17 +126,17 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
         }
         if (post.interestedMeta) normalizedPost.interestedMeta = MetaFromJson(post.interestedMeta)
 
-        backup.posts.set(identifier.val, normalizedPost)
+        backup.posts.set(identifier.value, normalizedPost)
     }
 
     for (const relation of relations || []) {
         const { profile, persona, favor } = relation
         const a = ProfileIdentifier.from(profile)
         const b = ECKeyIdentifier.from(persona)
-        if (a.some && b.some) {
+        if (a.isSome() && b.isSome()) {
             backup.relations.push({
-                profile: a.val,
-                persona: b.val,
+                profile: a.value,
+                persona: b.value,
                 favor,
             })
         }
@@ -144,8 +144,8 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
 
     for (const wallet of wallets || []) {
         if (wallet.privateKey?.d && !wallet.publicKey) {
-            // @ts-ignore
-            const ec = new (__.ec || __.default.ec)('secp256k1') as __.ec
+            // @ts-expect-error cjs-esm interop
+            const ec = new (__.ec || __.default.ec)('secp256k1')
             const key = ec.keyFromPrivate(wallet.privateKey.d)
             const hexPub = key.getPublic('hex').slice(2)
             const hexX = hexPub.slice(0, hexPub.length / 2)
@@ -157,15 +157,18 @@ export async function normalizeBackupVersion2(item: BackupJSONFileVersion2): Pro
             address: wallet.address,
             name: wallet.name,
             passphrase: wallet.passphrase ? Some(wallet.passphrase) : None,
+            mnemonicId: wallet.mnemonicId ? Some(wallet.mnemonicId) : None,
+            derivationPath: wallet.derivationPath ? Some(wallet.derivationPath) : None,
             publicKey: isEC_Public_JsonWebKey(wallet.publicKey) ? Some(wallet.publicKey) : None,
             privateKey: isEC_Private_JsonWebKey(wallet.privateKey) ? Some(wallet.privateKey) : None,
-            mnemonic: wallet.mnemonic
-                ? Some({
-                      words: wallet.mnemonic.words,
-                      hasPassword: wallet.mnemonic.parameter.withPassword,
-                      path: wallet.mnemonic.parameter.path,
-                  })
-                : None,
+            mnemonic:
+                wallet.mnemonic ?
+                    Some({
+                        words: wallet.mnemonic.words,
+                        hasPassword: wallet.mnemonic.parameter.withPassword,
+                        path: wallet.mnemonic.parameter.path,
+                    })
+                :   None,
             createdAt: new Date(wallet.createdAt),
             updatedAt: new Date(wallet.updatedAt),
         }
@@ -232,7 +235,7 @@ export function generateBackupVersion2(item: NormalizedBackup.Data): BackupJSONF
         const item: BackupJSONFileVersion2['posts'][0] = {
             identifier: id.toText(),
             foundAt: Number(data.foundAt),
-            postBy: data.postBy?.toText() || 'person:localhost/$unknown',
+            postBy: data.postBy.isSome() ? data.postBy.value.toText() : 'person:localhost/$unknown',
             interestedMeta: MetaToJson(data.interestedMeta),
             encryptBy: data.encryptBy.unwrapOr(undefined)?.toText(),
             summary: data.summary.unwrapOr(undefined),
@@ -242,11 +245,11 @@ export function generateBackupVersion2(item: NormalizedBackup.Data): BackupJSONF
             recipients: [],
         }
         result.posts.push(item)
-        if (data.recipients.some) {
-            if (data.recipients.val.type === 'public') item.recipients = 'everyone'
-            else if (data.recipients.val.type === 'e2e') {
+        if (data.recipients.isSome()) {
+            if (data.recipients.value.type === 'public') item.recipients = 'everyone'
+            else if (data.recipients.value.type === 'e2e') {
                 item.recipients = []
-                for (const [recipient, reasons] of data.recipients.val.receivers) {
+                for (const [recipient, reasons] of data.recipients.value.receivers) {
                     if (!reasons.length) continue
                     item.recipients.push([
                         recipient.toText(),
@@ -260,7 +263,7 @@ export function generateBackupVersion2(item: NormalizedBackup.Data): BackupJSONF
                         },
                     ])
                 }
-            } else safeUnreachable(data.recipients.val)
+            } else safeUnreachable(data.recipients.value)
         }
     }
 
@@ -287,6 +290,8 @@ export function generateBackupVersion2(item: NormalizedBackup.Data): BackupJSONF
                 .unwrapOr(undefined),
             createdAt: Number(data.createdAt),
             updatedAt: Number(data.updatedAt),
+            derivationPath: data.derivationPath.unwrapOr(undefined),
+            mnemonicId: data.mnemonicId.unwrapOr(undefined),
         })
     }
     return result
@@ -326,6 +331,7 @@ interface BackupJSONFileVersion2 {
         linkedProfiles: Array<[/** ProfileIdentifier.toText() */ string, LinkedProfileDetails]>
         createdAt: number // Unix timestamp
         updatedAt: number // Unix timestamp
+        address?: string
     }>
     profiles: Array<{
         identifier: string // ProfileIdentifier.toText()
@@ -367,6 +373,8 @@ interface BackupJSONFileVersion2 {
         }
         createdAt: number // Unix timestamp
         updatedAt: number // Unix timestamp
+        mnemonicId?: string
+        derivationPath?: string
     }>
     grantedHostPermissions: string[]
     plugin?: Record<string, unknown>

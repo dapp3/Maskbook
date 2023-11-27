@@ -2,11 +2,13 @@
  * Document url: https://github.com/nextdotid/kv_server/blob/develop/docs/api.apib
  */
 import urlcat from 'urlcat'
-import type { NextIDStoragePayload, NextIDPlatform } from '@masknet/shared-base'
-import { deleteCache, fetchJSON } from './helper'
-import { Err, Ok, Result } from 'ts-results'
-import type { NextIDBaseAPI } from '../types'
-import { KV_BASE_URL_DEV, KV_BASE_URL_PROD } from './constants'
+import { compact } from 'lodash-es'
+import { Err, Ok, type Result } from 'ts-results-es'
+import type { NextIDPlatform, NextIDStoragePayload } from '@masknet/shared-base'
+import { env } from '@masknet/flags'
+import { KV_BASE_URL_DEV, KV_BASE_URL_PROD } from './constants.js'
+import { staleNextIDCached } from './helpers.js'
+import { fetchCachedJSON, fetchJSON, fetchSquashedJSON } from '../helpers/fetchJSON.js'
 
 interface CreatePayloadResponse {
     uuid: string
@@ -14,26 +16,25 @@ interface CreatePayloadResponse {
     created_at: string
 }
 
-const BASE_URL =
-    process.env.channel === 'stable' && process.env.NODE_ENV === 'production' ? KV_BASE_URL_PROD : KV_BASE_URL_DEV
+const BASE_URL = env.channel === 'stable' && process.env.NODE_ENV === 'production' ? KV_BASE_URL_PROD : KV_BASE_URL_DEV
 
-function formatPatchData(pluginId: string, data: unknown) {
+function formatPatchData(pluginID: string, data: unknown) {
     return {
-        [pluginId]: data,
+        [pluginID]: data,
     }
 }
 
-export class NextIDStorageAPI implements NextIDBaseAPI.Storage {
+export class NextIDStorageProvider {
     /**
      * Get current KV of a persona
      * @param personaPublicKey
      *
      */
-    async getByIdentity<T>(
+    static async getByIdentity<T>(
         personaPublicKey: string,
         platform: NextIDPlatform,
         identity: string,
-        pluginId: string,
+        pluginID: string,
     ): Promise<Result<T, string>> {
         interface Proof {
             platform: NextIDPlatform
@@ -44,20 +45,39 @@ export class NextIDStorageAPI implements NextIDBaseAPI.Storage {
             persona: string
             proofs: Proof[]
         }
-        const response = await fetchJSON<Response>(
+        const response = await fetchSquashedJSON<Response | undefined>(
             urlcat(BASE_URL, '/v1/kv', { persona: personaPublicKey }),
-            undefined,
-            true,
         )
-        if (!response.ok) return Err('User not found')
-        const proofs = (response.val.proofs ?? [])
+        if (!response) return Err('User not found')
+
+        const proofs = (response.proofs ?? [])
             .filter((x) => x.platform === platform)
             .filter((x) => x.identity === identity.toLowerCase())
-        if (!proofs.length) return Err('Not found')
-        return Ok(proofs[0].content[pluginId])
+        if (!proofs.length) return Err('Proof not found')
+        return Ok(proofs[0].content[pluginID])
     }
-    async get<T>(personaPublicKey: string): Promise<Result<T, string>> {
-        return fetchJSON(urlcat(BASE_URL, '/v1/kv', { persona: personaPublicKey }))
+
+    static async getAllByIdentity<T>(
+        platform: NextIDPlatform,
+        identity: string,
+        pluginID: string,
+    ): Promise<Result<T[], string>> {
+        interface Proof {
+            avatar: string
+            content: Record<string, T>
+        }
+
+        interface Response {
+            values: Proof[]
+        }
+        const response = await fetchCachedJSON<Response>(urlcat(BASE_URL, '/v1/kv/by_identity', { platform, identity }))
+        if (!response) return Err('User not found')
+
+        const result = compact(response.values.map((x) => x.content[pluginID]))
+        return Ok(result)
+    }
+    static async get<T>(personaPublicKey: string): Promise<T> {
+        return fetchCachedJSON<T>(urlcat(BASE_URL, '/v1/kv', { persona: personaPublicKey }))
     }
     /**
      * Get signature payload for updating
@@ -65,22 +85,22 @@ export class NextIDStorageAPI implements NextIDBaseAPI.Storage {
      * @param platform
      * @param identity
      * @param patchData
-     * @param pluginId
+     * @param pluginID
      *
      * We choose [RFC 7396](https://www.rfc-editor.org/rfc/rfc7396) standard for KV modifying.
      */
-    async getPayload(
+    static async getPayload(
         personaPublicKey: string,
         platform: NextIDPlatform,
         identity: string,
         patchData: unknown,
-        pluginId: string,
-    ): Promise<Result<NextIDStoragePayload, string>> {
+        pluginID: string,
+    ): Promise<Result<NextIDStoragePayload, null>> {
         const requestBody = {
             persona: personaPublicKey,
             platform,
             identity,
-            patch: formatPatchData(pluginId, patchData),
+            patch: formatPatchData(pluginID, patchData),
         }
 
         const response = await fetchJSON<CreatePayloadResponse>(urlcat(BASE_URL, '/v1/kv/payload'), {
@@ -88,11 +108,13 @@ export class NextIDStorageAPI implements NextIDBaseAPI.Storage {
             method: 'POST',
         })
 
-        return response.map((x) => ({
-            signPayload: JSON.stringify(JSON.parse(x.sign_payload)),
-            createdAt: x.created_at,
-            uuid: x.uuid,
-        }))
+        return response ?
+                Ok({
+                    signPayload: JSON.stringify(JSON.parse(response.sign_payload)),
+                    createdAt: response.created_at,
+                    uuid: response.uuid,
+                })
+            :   Err(null)
     }
 
     /**
@@ -104,11 +126,11 @@ export class NextIDStorageAPI implements NextIDBaseAPI.Storage {
      * @param identity
      * @param createdAt
      * @param patchData
-     * @param pluginId
+     * @param pluginID
      *
      * We choose [RFC 7396](https://www.rfc-editor.org/rfc/rfc7396) standard for KV modifying.
      */
-    set<T>(
+    static async set<T>(
         uuid: string,
         personaPublicKey: string,
         signature: string,
@@ -116,23 +138,27 @@ export class NextIDStorageAPI implements NextIDBaseAPI.Storage {
         identity: string,
         createdAt: string,
         patchData: unknown,
-        pluginId: string,
-    ): Promise<Result<T, string>> {
+        pluginID: string,
+    ): Promise<Result<T, null>> {
         const requestBody = {
             uuid,
             persona: personaPublicKey,
             platform,
             identity,
             signature,
-            patch: formatPatchData(pluginId, patchData),
+            patch: formatPatchData(pluginID, patchData),
             created_at: createdAt,
         }
 
-        deleteCache(urlcat(BASE_URL, '/v1/kv', { persona: personaPublicKey }))
-
-        return fetchJSON(urlcat(BASE_URL, '/v1/kv'), {
+        const result = await fetchJSON<T>(urlcat(BASE_URL, '/v1/kv'), {
             body: JSON.stringify(requestBody),
             method: 'POST',
         })
+
+        if (result) {
+            await staleNextIDCached(urlcat(BASE_URL, '/v1/kv', { persona: personaPublicKey }))
+        }
+
+        return result ? Ok(result) : Err(null)
     }
 }

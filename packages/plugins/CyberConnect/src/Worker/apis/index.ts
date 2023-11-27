@@ -1,4 +1,13 @@
-export interface IQuery {
+import {
+    createIndicator,
+    createNextIndicator,
+    createPageable,
+    type PageIndicator,
+    type Pageable,
+} from '@masknet/shared-base'
+import { PageSize, ProfileTab } from '../../constants.js'
+
+interface IQuery {
     query: string
     variables: Record<string, string | number>
 }
@@ -8,7 +17,8 @@ export interface IFollowIdentity {
     ens: string
     namespace: string
 }
-export interface IIdentity {
+
+interface IIdentity {
     address: string
     avatar: string
     domain: string
@@ -22,15 +32,16 @@ export interface IIdentity {
         list: IFollowIdentity[]
     }
 }
-export interface IFollowStatus {
+interface IFollowStatus {
     isFollowing: boolean
     isFollowed: boolean
 }
 async function query(data: IQuery) {
     const url =
-        process.env.NODE_ENV === 'production'
-            ? 'https://api.cybertino.io/connect/'
-            : 'https://api.stg.cybertino.io/connect/'
+        process.env.NODE_ENV === 'production' ?
+            'https://api.cybertino.io/connect/'
+        :   'https://api.stg.cybertino.io/connect/'
+
     const res = await fetch(url, {
         method: 'POST',
         mode: 'cors',
@@ -45,22 +56,38 @@ async function query(data: IQuery) {
 }
 export async function fetchIdentity(address: string): Promise<{ data: { identity: IIdentity } }> {
     const data = {
-        query: `query Identity($address: String!, $first: Int, $after: String) {
-        identity(address: $address) {
+        query: `query QueryForENS {
+        identity(address: "${address.toLowerCase()}") {
             address
             ens
             domain
             avatar
-            followerCount(namespace:"")
-            followingCount(namespace:"")
-            followings(first: $first, after: $after){
-                list {
-                    address
-                    ens
-                    namespace
+        }
+    }`,
+        variables: {},
+    }
+    const res = await query(data)
+    return res
+}
+
+export async function fetchFollowers(
+    category: ProfileTab,
+    address: string,
+    size: number,
+    indicator?: PageIndicator,
+): Promise<Pageable<IFollowIdentity>> {
+    const data = {
+        query: `query FullIdentityQuery {
+        identity(address: "${address.toLowerCase()}") {
+                ${category.toLowerCase()}(first: ${size > PageSize ? PageSize : size}, after: "${
+                    Number.parseInt(indicator?.id ?? '0', 10) - 1
+                }"){
+                pageInfo {
+                    hasNextPage
+                    hasPreviousPage
+                    endCursor
+                    startCursor
                 }
-            }
-            followers(first: $first, after: $after){
                 list {
                     address
                     ens
@@ -69,34 +96,44 @@ export async function fetchIdentity(address: string): Promise<{ data: { identity
             }
         }
     }`,
-        variables: {
-            address: address.toLowerCase(),
-            first: 100,
-            after: '',
-        },
+        variables: {},
     }
     const res = await query(data)
-    return res
+    if (category === ProfileTab.Followings)
+        return createPageable(
+            res.data.identity.followings.list,
+            createIndicator(indicator),
+            res.data.identity.followings.pageInfo.hasNextPage ?
+                createNextIndicator(indicator, res.data.identity.followings.pageInfo.endCursor)
+            :   undefined,
+        )
+    return createPageable(
+        res.data.identity.followers.list,
+        createIndicator(indicator),
+        res.data.identity.followers.pageInfo.hasNextPage ?
+            createNextIndicator(indicator, res.data.identity.followers.pageInfo.endCursor)
+        :   undefined,
+    )
 }
-export async function fetchFollowStatus(
-    fromAddr: string,
-    toAddr: string,
-): Promise<{ data: { followStatus: IFollowStatus } }> {
+
+export async function fetchFollowStatus(fromAddr: string, toAddr: string): Promise<IFollowStatus> {
     const data = {
-        query: `query FollowStatus(
-            $fromAddr: String!
-            $toAddr: String!
-          ) {
-            followStatus(fromAddr: $fromAddr, toAddr: $toAddr, namespace: "Mask") {
-              isFollowed
-              isFollowing
+        query: `query FollowStatusQuery {
+            connections(
+                fromAddr: "${fromAddr}"
+                toAddrList: ["${toAddr}"]
+                network: ETH
+            ) {
+                fromAddr
+                toAddr
+                followStatus {
+                    isFollowed
+                    isFollowing
+                }
             }
-          }`,
-        variables: {
-            fromAddr: fromAddr.toLowerCase(),
-            toAddr: toAddr.toLowerCase(),
-        },
+        }`,
+        variables: {},
     }
     const res = await query(data)
-    return res
+    return res.data.connections[0]?.followStatus ?? { isFollowed: false, isFollowing: false }
 }

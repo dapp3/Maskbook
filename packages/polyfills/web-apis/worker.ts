@@ -1,1 +1,1 @@
-import './implementation/EventTarget-abortSignal'
+import './implementation/Response.blob.js'

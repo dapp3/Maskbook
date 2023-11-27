@@ -3,9 +3,8 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "../dist/shared/",
-    "tsBuildInfoFile": "../dist/shared.tsbuildinfo",
-    "types": ["@types/web"]
+    "tsBuildInfoFile": "../dist/shared.tsbuildinfo"
   },
   "include": ["./"],
-  "references": [{ "path": "../public-api" }]
+  "references": [{ "path": "../public-api/tsconfig.json" }]
 }

@@ -1,6 +1,12 @@
-import { CustomEventId, InternalEvents, encodeEvent } from '../shared'
+import { CustomEventId, type InternalEvents, encodeEvent } from '../shared/index.js'
 
+let warned = false
 export function sendEvent<K extends keyof InternalEvents>(name: K, ...params: InternalEvents[K]) {
+    if (!warned && typeof location === 'object' && location.protocol.includes('extension')) {
+        console.warn('This code is not expected to be run in the extension pages. Please check your code.')
+        warned = true
+    }
+    if (typeof document === 'undefined') return
     document.dispatchEvent(
         new CustomEvent(CustomEventId, {
             cancelable: true,
@@ -9,7 +15,7 @@ export function sendEvent<K extends keyof InternalEvents>(name: K, ...params: In
         }),
     )
 }
-const promisePool = new Map<number, [resolve: Function, reject: Function]>()
+const promisePool = new Map<number, [resolve: (value: any) => void, reject: (reason?: any) => void]>()
 let id = 1
 export function createPromise<T>(callback: (id: number) => void) {
     return new Promise<T>((resolve, reject) => {

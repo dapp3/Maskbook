@@ -1,5 +1,5 @@
 import { makeStyles } from '@masknet/theme'
-import { Button, Checkbox, CheckboxProps } from '@mui/material'
+import { Button, Checkbox, type CheckboxProps } from '@mui/material'
 
 const useStyles = makeStyles()((theme) => {
     return {
@@ -7,12 +7,15 @@ const useStyles = makeStyles()((theme) => {
             flex: 1,
             backgroundImage: 'none',
             boxShadow: 'none',
+            padding: 0,
+            maxWidth: 100,
             '&:hover': {
                 backgroundColor: 'transparent !important',
             },
         },
         button: {
             flex: 1,
+            fontSize: 16,
             '& span': {
                 display: 'none',
             },
@@ -20,7 +23,7 @@ const useStyles = makeStyles()((theme) => {
     }
 })
 
-export interface RadioChipProps extends CheckboxProps {
+interface RadioChipProps extends CheckboxProps {
     label: string
 }
 

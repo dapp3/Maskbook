@@ -1,14 +1,6 @@
-import { createPluginMessage, PluginMessageEmitter, createPluginRPC } from '@masknet/plugin-infra'
-import { serializer } from '@masknet/shared-base'
-import { PLUGIN_ID } from './constants'
-export interface PetMessage {
-    setResult: number
-    rpc: unknown
-}
+import { getPluginRPC } from '@masknet/plugin-infra'
+import { PLUGIN_ID } from './constants.js'
 
-if (import.meta.webpackHot) import.meta.webpackHot.accept()
-export const PluginMessages: { events: PluginMessageEmitter<PetMessage> } = {
-    events: createPluginMessage<PetMessage>(PLUGIN_ID, serializer),
-}
+import.meta.webpackHot?.accept()
 
-export const PluginScamRPC = createPluginRPC(PLUGIN_ID, () => import('./Services'), PluginMessages.events.rpc)
+export const PluginScamRPC = getPluginRPC<typeof import('./Worker/rpc.js')>(PLUGIN_ID)

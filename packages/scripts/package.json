@@ -2,25 +2,34 @@
   "name": "@masknet/cli",
   "version": "0.0.0",
   "private": true,
+  "sideEffects": false,
+  "type": "module",
   "bin": {
-    "build": "./src/bin/build.ts",
-    "dev": "./src/bin/dev.ts"
+    "build": "./src/bin/build.mjs",
+    "dev": "./src/bin/dev.mjs",
+    "__build": "./src/bin/build.ts",
+    "__dev": "./src/bin/dev.ts"
   },
   "dependencies": {
-    "@types/rimraf": "^3.0.2",
-    "chalk": "^4.1.2",
-    "enquirer": "^2.3.6",
-    "fs-extra": "^10.1.0",
-    "gulp-zip": "^5.1.0",
-    "proper-lockfile": "^4.1.1",
-    "rimraf": "^3.0.2",
-    "yargs": "^17.5.1"
+    "@masknet/static-module-record-swc": "^0.4.1",
+    "chalk": "^5.3.0",
+    "dotenv": "^16.3.1",
+    "enquirer": "^2.4.1",
+    "fs-extra": "^11.1.1",
+    "glob": "^10.3.4",
+    "proper-lockfile": "^4.1.2",
+    "rimraf": "^5.0.1",
+    "source-map": "^0.7.4",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@types/fs-extra": "^9.0.13",
-    "@types/gulp": "^4.0.9",
-    "@types/lodash": "^4.14.182",
+    "@types/fs-extra": "^11.0.1",
+    "@types/gulp": "^4.0.13",
+    "@types/node": "20.5.7",
     "@types/proper-lockfile": "^4.1.2",
-    "ts-node": "^10.8.1"
+    "@types/yargs": "^17.0.24",
+    "gulp-cli": "^2.3.0",
+    "ts-node": "^10.9.1",
+    "web-ext": "^7.6.2"
   }
 }

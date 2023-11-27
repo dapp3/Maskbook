@@ -1,22 +1,26 @@
-import { type Plugin, PluginId } from '@masknet/plugin-infra'
-import { languages } from './locales/languages'
-import { META_KEY_1, META_KEY_2 } from './constants'
+import type { Plugin } from '@masknet/plugin-infra'
+import { DEFAULT_PLUGIN_PUBLISHER, EnhanceableSite, PluginID } from '@masknet/shared-base'
+import { languages } from './locales/languages.js'
+import { META_KEY_1, META_KEY_2, META_KEY_3 } from './constants.js'
 
 export const base: Plugin.Shared.Definition = {
-    ID: PluginId.FileService,
-    name: { fallback: 'File Service', i18nKey: '__display_name' },
+    ID: PluginID.FileService,
+    name: { fallback: 'File Service' },
     description: {
         fallback: 'Upload and share files on top of Arweave network. Store data, permanently.',
-        i18nKey: '__description',
     },
-    publisher: { name: { fallback: 'Mask Network' }, link: 'https://mask.io' },
+    publisher: DEFAULT_PLUGIN_PUBLISHER,
     enableRequirement: {
-        architecture: { app: true, web: true },
-        networks: { type: 'opt-out', networks: {} },
+        supports: {
+            type: 'opt-out',
+            sites: {
+                [EnhanceableSite.Localhost]: true,
+            },
+        },
         target: 'stable',
     },
     i18n: languages,
     contribution: {
-        metadataKeys: new Set([META_KEY_1, META_KEY_2]),
+        metadataKeys: new Set([META_KEY_1, META_KEY_2, META_KEY_3]),
     },
 }

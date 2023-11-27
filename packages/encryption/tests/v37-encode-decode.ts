@@ -1,9 +1,8 @@
-import { test, expect } from '@jest/globals'
-import { None, Some } from 'ts-results'
-import { encodePayload, parsePayload, PayloadWellFormed } from '../src'
-import { importAES } from '../src/utils'
-import { ProfileIdentifier } from '@masknet/shared-base'
-import { queryTestPublicKey } from './keys'
+import { test, expect } from 'vitest'
+import { None, Some } from 'ts-results-es'
+import { encodePayload, parsePayload, type PayloadWellFormed, importAESFromJWK } from '../src/index.js'
+import { ProfileIdentifier } from '@masknet/base'
+import { queryTestPublicKey } from './keys.js'
 
 test('Encode v37 payload', async () => {
     const payload: PayloadWellFormed.Payload = {
@@ -37,14 +36,14 @@ test('Encode v37 payload', async () => {
         const newPayload = { ...payload }
         newPayload.author = Some(ProfileIdentifier.of('localhost', 'unknown').unwrap())
         const k256Key = (await queryTestPublicKey(ProfileIdentifier.of('localhost', 'alice').unwrap()))!
-        newPayload.authorPublicKey = Some(k256Key)
+        newPayload.authorPublicKey = k256Key
         newPayload.encryption = {
             type: 'E2E',
             iv: payload.encryption.iv,
             ephemeralPublicKey: new Map(),
             ownersAESKeyEncrypted: new Uint8Array([5, 6, 7, 8, 9, 10]),
         }
-        newPayload.encryption.ephemeralPublicKey.set(k256Key.algr, k256Key.key)
+        newPayload.encryption.ephemeralPublicKey.set(k256Key.unwrap().algr, k256Key.unwrap().key)
 
         const encoded = (await encodePayload.NoSign(newPayload).then((x) => x.unwrap())) as Uint8Array
         expect(encoded).toMatchSnapshot('Full payload')
@@ -55,7 +54,7 @@ test('Encode v37 payload', async () => {
 })
 
 async function getAESKey(): Promise<PayloadWellFormed.PublicEncryption['AESKey']> {
-    return (await importAES(testKey)).unwrap()
+    return (await importAESFromJWK(testKey)).unwrap()
 }
 const testKey = {
     alg: 'A256GCM',

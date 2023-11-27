@@ -1,4 +1,3 @@
-export * from './types'
-export { MaskColors } from './colors'
-export { MaskThemeProvider } from './Provider'
-export { MaskDarkTheme, MaskLightTheme } from './theme'
+export { MaskColors } from './colors.js'
+export { MaskThemeProvider } from './Provider.js'
+export { MaskDarkTheme, MaskLightTheme } from './theme.js'

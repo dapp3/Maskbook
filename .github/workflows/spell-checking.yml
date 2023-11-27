@@ -2,22 +2,27 @@ name: Check Spell
 
 on:
   pull_request:
-    branches: [develop*]
+    branches: [master, develop, released, hotfix/*, release/*]
+  merge_group:
+    types: [checks_requested]
 
-# Cancels all previous workflow runs for pull requests that have not completed.
+permissions:
+  contents: read
+
 concurrency:
-  # The concurrency group contains the workflow name and the branch name for
-  # pull requests or the commit hash for any other events.
   group: ${{ github.workflow }}-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
   check-spell:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
       - name: Check Spell
+        if: ${{ github.event.pull_request }}
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          git diff --name-only origin/${{ github.event.pull_request.base.ref }} | xargs npx cspell lint --no-must-find-files
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }} | xargs npx cspell lint --no-must-find-files --no-progress

@@ -1,11 +1,5 @@
-import { decodeArrayBuffer } from '@dimensiondev/kit'
-import type { MobilePersona } from '@masknet/public-api'
-import {
-    ECKeyIdentifierFromJsonWebKey,
-    EC_JsonWebKey,
-    isEC_Private_JsonWebKey,
-    PersonaIdentifier,
-} from '@masknet/shared-base'
+import { decodeArrayBuffer } from '@masknet/kit'
+import { ECKeyIdentifier, isEC_Private_JsonWebKey, MaskMessages, type PersonaIdentifier } from '@masknet/shared-base'
 import { decode } from '@msgpack/msgpack'
 import {
     consistentPersonaDBWriteAccess,
@@ -15,9 +9,8 @@ import {
     safeDeletePersonaDB,
     updatePersonaDB,
     queryPersonasDB,
-} from '../../../database/persona/db'
-import { personaRecordToMobilePersona } from './mobile'
-import { recover_ECDH_256k1_KeyPair_ByMnemonicWord, validateMnemonic } from './utils'
+} from '../../../database/persona/db.js'
+import { recover_ECDH_256k1_KeyPair_ByMnemonicWord, validateMnemonic } from './utils.js'
 
 export async function deletePersona(id: PersonaIdentifier, confirm: 'delete even with private' | 'safe delete') {
     return consistentPersonaDBWriteAccess(async (t) => {
@@ -31,8 +24,7 @@ export async function deletePersona(id: PersonaIdentifier, confirm: 'delete even
     })
 }
 
-/** @internal looks like not directly used. let's not exposing it for now. */
-export async function loginPersona(identifier: PersonaIdentifier) {
+async function loginPersona(identifier: PersonaIdentifier) {
     return consistentPersonaDBWriteAccess((t) =>
         updatePersonaDB(
             { identifier, hasLogout: false },
@@ -43,13 +35,15 @@ export async function loginPersona(identifier: PersonaIdentifier) {
 }
 
 export async function logoutPersona(identifier: PersonaIdentifier) {
-    return consistentPersonaDBWriteAccess((t) =>
+    await consistentPersonaDBWriteAccess((t) =>
         updatePersonaDB(
             { identifier, hasLogout: true },
             { linkedProfiles: 'merge', explicitUndefinedField: 'ignore' },
             t,
         ),
     )
+
+    MaskMessages.events.personasChanged.sendToAll()
 }
 
 export async function setupPersona(id: PersonaIdentifier) {
@@ -71,7 +65,7 @@ export async function setupPersona(id: PersonaIdentifier) {
 export async function loginExistPersonaByPrivateKey(privateKeyString: string): Promise<PersonaIdentifier | null> {
     const privateKey = decode(decodeArrayBuffer(privateKeyString))
     if (!isEC_Private_JsonWebKey(privateKey)) throw new TypeError('Invalid private key')
-    const identifier = await ECKeyIdentifierFromJsonWebKey(privateKey)
+    const identifier = (await ECKeyIdentifier.fromJsonWebKey(privateKey)).unwrap()
 
     const persona = await queryPersonaDB(identifier, undefined, true)
     if (persona) {
@@ -80,19 +74,6 @@ export async function loginExistPersonaByPrivateKey(privateKeyString: string): P
         return identifier
     }
 
-    return null
-}
-
-export async function mobile_queryPersonaByPrivateKey(privateKeyString: string): Promise<MobilePersona | null> {
-    if (process.env.architecture !== 'app') throw new Error('This function is only available in app')
-    const privateKey = decode(decodeArrayBuffer(privateKeyString)) as EC_JsonWebKey
-    const identifier = await ECKeyIdentifierFromJsonWebKey(privateKey)
-
-    const persona = await queryPersonaDB(identifier, undefined, true)
-    if (persona) {
-        await loginPersona(persona.identifier)
-        return personaRecordToMobilePersona(persona)
-    }
     return null
 }
 
@@ -106,13 +87,11 @@ export async function renamePersona(identifier: PersonaIdentifier, nickname: str
 }
 
 export async function queryPersonaByMnemonic(mnemonic: string, password: ''): Promise<PersonaIdentifier | null> {
-    const verify = validateMnemonic(mnemonic)
-    if (!verify) {
-        throw new Error('Verify error')
-    }
+    const verified = await validateMnemonic(mnemonic)
+    if (!verified) throw new Error('Verify error')
 
     const { key } = await recover_ECDH_256k1_KeyPair_ByMnemonicWord(mnemonic, password)
-    const identifier = await ECKeyIdentifierFromJsonWebKey(key.privateKey)
+    const identifier = (await ECKeyIdentifier.fromJsonWebKey(key.privateKey)).unwrap()
     const persona = await queryPersonaDB(identifier, undefined, true)
     if (persona) {
         await loginPersona(persona.identifier)

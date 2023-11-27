@@ -1,16 +1,14 @@
-import { concatArrayBuffer, decodeArrayBuffer } from '@dimensiondev/kit'
-import type { AESCryptoKey, EC_Public_CryptoKey } from '@masknet/shared-base'
-import { encryptWithAES } from '../utils'
+import { concatArrayBuffer, decodeArrayBuffer } from '@masknet/kit'
+import type { AESCryptoKey, EC_Public_CryptoKey } from '@masknet/base'
+import { encryptWithAES } from '../utils/index.js'
 import {
-    EncryptError,
-    EncryptErrorReasons,
-    EncryptIO,
-    EncryptionResultE2E,
-    EncryptionResultE2EMap,
-    EncryptResult,
-    EncryptTargetE2E,
-} from './EncryptionTypes'
-import { fillIV } from './utils'
+    type EncryptIO,
+    type EncryptionResultE2E,
+    type EncryptionResultE2EMap,
+    type EncryptResult,
+    type EncryptTargetE2E,
+} from './EncryptionTypes.js'
+import { fillIV } from './utils.js'
 
 const KEY = decodeArrayBuffer('KEY')
 const IV = decodeArrayBuffer('IV')
@@ -55,7 +53,7 @@ export async function deriveAESByECDH_version38OrOlderExtraSteps(
 export async function v38_addReceiver(
     postKeyEncoded: Promise<Uint8Array>,
     target: EncryptTargetE2E,
-    io: Pick<EncryptIO, 'deriveAESKey' | 'queryPublicKey' | 'getRandomValues'>,
+    io: Pick<EncryptIO, 'deriveAESKey' | 'getRandomValues'>,
 ): Promise<EncryptionResultE2EMap> {
     // For every receiver R,
     //     1. Let R_pub = R.publicKey
@@ -66,9 +64,7 @@ export async function v38_addReceiver(
     //     4. Calculate new AES key and IV based on Internal_AES and ivToBePublish.
     //     Note: Internal_AES is not returned by io.deriveAESKey_version38_or_older, it is internal algorithm of that method.
     const ecdh = Promise.allSettled(
-        target.target.map(async (id): Promise<EncryptionResultE2E> => {
-            const receiverPublicKey = await io.queryPublicKey(id)
-            if (!receiverPublicKey) throw new EncryptError(EncryptErrorReasons.PublicKeyNotFound)
+        target.target.map(async (receiverPublicKey): Promise<EncryptionResultE2E> => {
             const ivToBePublished = fillIV(io)
             const [[aes, iv]] = await deriveAESByECDH_version38OrOlderExtraSteps(
                 async (e) => [await io.deriveAESKey(e)],
@@ -79,7 +75,7 @@ export async function v38_addReceiver(
             return {
                 ivToBePublished,
                 encryptedPostKey: encryptedPostKey.unwrap(),
-                target: id,
+                target: receiverPublicKey,
             }
         }),
     ).then((x) => x.entries())

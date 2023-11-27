@@ -3,18 +3,15 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "../dist/shared-ui/",
-    "tsBuildInfoFile": "../dist/shared-ui.tsbuildinfo",
-    "emitDeclarationOnly": true,
-    "lib": ["ES2021"]
+    "tsBuildInfoFile": "../dist/shared-ui.tsbuildinfo"
   },
   "include": ["./", "./**/*.json"],
   "references": [
-    { "path": "../utils-pure" },
-    { "path": "../../shared/" },
-    { "path": "../../shared-base" },
-    { "path": "../../typed-message/base" },
-    { "path": "../../typed-message/dom" },
-    { "path": "../../theme" },
-    { "path": "../../plugin-infra" }
+    { "path": "../background/tsconfig.json" },
+    { "path": "../../shared/tsconfig.json" },
+    { "path": "../../shared-base/tsconfig.json" },
+    { "path": "../../typed-message/base/tsconfig.json" },
+    { "path": "../../typed-message/react/tsconfig.json" },
+    { "path": "../../plugin-infra/tsconfig.json" }
   ]
 }

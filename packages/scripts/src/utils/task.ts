@@ -1,5 +1,8 @@
-import type { TaskFunction } from 'gulp'
-import { shell, awaitChildProcess } from './'
+import { series, type TaskFunction } from 'gulp'
+import { shell } from './run.js'
+import { awaitChildProcess } from './awaitChildProcess.js'
+import { cleanupWhenExit } from './exit.js'
+
 export function task(f: TaskFunction, name: string, description: string, flags?: TaskFunction['flags']): TaskFunction {
     f.displayName = name
     f.description = description
@@ -20,13 +23,27 @@ export function watchTask(
 }
 
 /** Generate Task and Task-Watch from npm scripts (`npm start` and `npm build`) */
-export function fromNPMTask(baseDir: string, name: string, description: string, flags?: TaskFunction['flags']) {
+export function fromNPMTask(
+    baseDir: URL,
+    name: string,
+    description: string,
+): [build: () => Promise<number>, watch: () => Promise<void>] {
     function build() {
         return awaitChildProcess(shell.cwd(baseDir)`pnpm run build`)
     }
     async function watch() {
+        cleanupWhenExit()
         shell.cwd(baseDir)`pnpm run start`
     }
-    watchTask(build, watch, name, description, flags)
+    watchTask(build, watch, name, description)
     return [build, watch]
+}
+
+export function awaitTask(taskFunction: TaskFunction) {
+    return new Promise<void>((resolve, reject) => {
+        series(taskFunction)((err) => {
+            if (err) reject(err)
+            else resolve()
+        })
+    })
 }

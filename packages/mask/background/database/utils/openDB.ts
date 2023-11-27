@@ -13,16 +13,9 @@ import type {
     IDBPCursor,
 } from 'idb/with-async-ittr'
 import { assertEnvironment, Environment } from '@dimensiondev/holoflows-kit'
-import { MaskMessages } from '../../../shared'
-import fixSafari from 'safari-14-idb-fix'
 
 export function createDBAccess<DBSchema>(opener: () => Promise<IDBPDatabase<DBSchema>>) {
     let db: IDBPDatabase<DBSchema> | undefined = undefined
-    if (process.env.engine === 'safari' && process.env.architecture === 'app') {
-        // iOS bug: indexedDB dies randomly
-        MaskMessages.events.mobile_app_suspended.on(clean)
-        setInterval(clean, /** 1 min */ 1000 * 60)
-    }
     function clean() {
         if (db) {
             db.close()
@@ -31,9 +24,6 @@ export function createDBAccess<DBSchema>(opener: () => Promise<IDBPDatabase<DBSc
         db = undefined
     }
     return async () => {
-        if (process.env.engine === 'safari' && process.env.architecture === 'app') {
-            await fixSafari()
-        }
         assertEnvironment(Environment.ManifestBackground)
         if (db) {
             try {
@@ -59,23 +49,9 @@ export function createDBAccessWithAsyncUpgrade<DBSchema, AsyncUpgradePreparedDat
     dbName: string,
 ) {
     let db: IDBPDatabase<DBSchema> | undefined = undefined
-    if (process.env.engine === 'safari') {
-        // iOS bug: indexedDB dies randomly
-        MaskMessages.events.mobile_app_suspended.on(clean)
-        setInterval(clean, /** 1 min */ 1000 * 60)
-    }
-    function clean() {
-        if (db) {
-            db.close()
-            db.addEventListener('close', () => (pendingOpen = db = undefined), { once: true })
-        }
-        pendingOpen = db = undefined
-    }
+
     let pendingOpen: Promise<IDBPDatabase<DBSchema>> | undefined
     async function open(): Promise<IDBPDatabase<DBSchema>> {
-        if (process.env.engine === 'safari' && process.env.architecture === 'app') {
-            await fixSafari()
-        }
         assertEnvironment(Environment.ManifestBackground)
         if (db?.version === latestVersion) return db
         let currentVersion = firstVersionThatRequiresAsyncUpgrade
@@ -117,13 +93,13 @@ export function createDBAccessWithAsyncUpgrade<DBSchema, AsyncUpgradePreparedDat
         return promise
     }
 }
-export interface IDBPSafeObjectStore<
+interface IDBPSafeObjectStore<
     DBTypes extends DBSchema,
     TxStores extends Array<StoreNames<DBTypes>> = Array<StoreNames<DBTypes>>,
     StoreName extends StoreNames<DBTypes> = StoreNames<DBTypes>,
     Writable extends boolean = boolean,
 > extends Pick<
-        IDBPObjectStore<DBTypes, TxStores, StoreName, 'readonly'>,
+        IDBPObjectStore<DBTypes, TxStores, StoreName>,
         'get' | 'getAll' | 'getAllKeys' | 'getKey' | 'count' | 'autoIncrement' | 'indexNames' | 'keyPath' | 'name'
     > {
     add: Writable extends true ? IDBPObjectStore<DBTypes, TxStores, StoreName, 'readwrite'>['add'] : unknown
@@ -187,11 +163,11 @@ export type IDBPSafeTransaction<
     readonly mode: IDBTransactionMode
     readonly __writable__?: Mode extends 'readwrite' ? true : boolean
     readonly __stores__?: Record<
-        TxStores extends ReadonlyArray<infer ValueOfUsedStoreName>
-            ? ValueOfUsedStoreName extends string | number | symbol
-                ? ValueOfUsedStoreName
-                : never
-            : never,
+        TxStores extends ReadonlyArray<infer ValueOfUsedStoreName> ?
+            ValueOfUsedStoreName extends string | number | symbol ?
+                ValueOfUsedStoreName
+            :   never
+        :   never,
         never
     >
     objectStore<StoreName extends TxStores[number]>(

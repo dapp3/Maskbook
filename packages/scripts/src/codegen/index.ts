@@ -1,21 +1,17 @@
-import { getProcessLock, watchTask } from '../utils'
-import { series, parallel, TaskFunctionCallback } from 'gulp'
-import { i18nCodegen, i18nCodegenWatch } from './i18n-codegen'
-import { typescript, typescriptWatch } from './typescript'
-import { isLocked } from '../utils'
-import { resourceCopy, resourceCopyWatch } from './resource-files'
+import { getProcessLock, markTaskNeedCleanup, watchTask } from '../utils/index.js'
+import { series, parallel, type TaskFunction } from 'gulp'
+import { i18nCodegen, i18nCodegenWatch } from './i18n-codegen.js'
+import { typescriptWatch } from './typescript.js'
+import { iconCodegen, iconCodegenWatch } from './icon-codegen.js'
 
-export function codegen(cb: TaskFunctionCallback) {
-    if (isLocked('codegen')) return cb()
-    const codegen = series(i18nCodegen, typescript, resourceCopy)
-    codegen(cb)
-}
-export const codegenWatch = series(
-    getProcessLock.bind(null, 'codegen'),
-    parallel(resourceCopyWatch, i18nCodegenWatch, typescriptWatch),
+// typescript is explicitly eliminated from this task.
+// our build process does not rely on tsc to give output, we have an extra check for tsc.
+export const codegen: TaskFunction = series(i18nCodegen, iconCodegen)
+export const codegenWatch: TaskFunction = markTaskNeedCleanup(
+    series(getProcessLock.bind(null, 'codegen'), parallel(i18nCodegenWatch, typescriptWatch, iconCodegenWatch)),
 )
 watchTask(codegen, codegenWatch, 'codegen', 'All codegen tasks combined into one')
 
-export * from './i18n-codegen'
-export * from './typescript'
-export * from './resource-files'
+export * from './i18n-codegen.js'
+export * from './icon-codegen.js'
+export * from './typescript.js'

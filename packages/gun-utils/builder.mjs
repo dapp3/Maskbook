@@ -32,12 +32,15 @@ function init() {
     function String() {
         return globalThis.String.apply(this, arguments)
     }
+    String.fromCharCode = globalThis.String.fromCharCode
+    String.fromCodePoint = globalThis.String.fromCodePoint
     const window = {
         setTimeout,
         location,
         Object,
         console,
         String,
+        JSON,
         TextEncoder: globalThis.TextEncoder,
         TextDecoder: globalThis.TextDecoder,
         crypto: globalThis.crypto,
@@ -66,7 +69,9 @@ const patchedSource = files
 
 const result = `(() => {
 ${init.toString().replace('// Source Code Here', patchedSource)};
-globalThis.Gun = ${init.name}().Gun;
+if (!globalThis.Gun) {
+    globalThis.Gun = ${init.name}().Gun;
+}
 })();
 undefined;
 `

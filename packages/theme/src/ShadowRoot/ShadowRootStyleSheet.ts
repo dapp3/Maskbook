@@ -1,5 +1,7 @@
+/// <reference types="@masknet/global-types/firefox" />
+/// <reference types="@masknet/global-types/env" />
+
 const shadowHeadMap = new WeakMap<ShadowRoot, HTMLHeadElement>()
-const constructableStyleSheetEnabled = true
 
 // There are 2 rendering mode of this ShadowRootStyleSheet.
 // 1. If the host supports ConstructableStyleSheet proposal:
@@ -19,9 +21,7 @@ export class StyleSheet {
         this.key = options.key
         if (options.container instanceof ShadowRoot) {
             this.implementation =
-                constructableStyleSheetEnabled && 'adoptedStyleSheets' in Document.prototype
-                    ? new ConstructableStyleSheet()
-                    : new SynchronizeStyleSheet()
+                'adoptedStyleSheets' in Document.prototype ? new ConstructableStyleSheet() : new SynchronizeStyleSheet()
             this.addContainer(options.container)
             Reflect.set(this.container, 'sheet', this)
         } else {
@@ -29,6 +29,8 @@ export class StyleSheet {
             const un_global = Reflect.get(options.container, 'sheet')
             if (!(un_global instanceof StyleSheet)) throw new TypeError()
 
+            // A hack to the emotion StyleSheet
+            // eslint-disable-next-line no-constructor-return
             return {
                 tags: [],
                 key: options.key,
@@ -68,6 +70,7 @@ export class StyleSheet {
     private implementation!: ConstructableStyleSheet | SynchronizeStyleSheet
     private _alreadyInsertedOrderInsensitiveRule = false
 }
+
 class ConstructableStyleSheet {
     private sheet = new CSSStyleSheet()
     private globalSheet = new CSSStyleSheet()
@@ -75,7 +78,16 @@ class ConstructableStyleSheet {
     addContainer(container: ShadowRoot) {
         if (this.added.has(container)) return
         this.added.add(container)
-        container.adoptedStyleSheets = [this.globalSheet, ...(container.adoptedStyleSheets || []), this.sheet]
+
+        if (typeof XPCNativeWrapper === 'undefined') {
+            // push & unshift crashes Chrome 103. Not tested on other versions.
+            container.adoptedStyleSheets = [this.globalSheet, ...container.adoptedStyleSheets, this.sheet]
+        } else {
+            // assignment does not work on Firefox 102. Not tested on other versions.
+            const unsafe = XPCNativeWrapper.unwrap(container.adoptedStyleSheets)
+            Array.prototype.unshift.call(unsafe, XPCNativeWrapper.unwrap(this.globalSheet))
+            Array.prototype.push.call(unsafe, XPCNativeWrapper.unwrap(this.sheet))
+        }
     }
     insert(rule: string) {
         insertRuleSpeedy(this.sheet, rule)
@@ -176,7 +188,7 @@ function insertRuleSpeedy(sheet: CSSStyleSheet, rule: string) {
         if (
             process.env.NODE_ENV !== 'production' &&
             // cspell:ignore focusring
-            !/:(-moz-placeholder|-moz-focus-inner|-moz-focusring|-ms-input-placeholder|-moz-read-write|-moz-read-only|-ms-clear){/.test(
+            !/:(-moz-placeholder|-moz-focus-inner|-moz-focusring|-ms-input-placeholder|-moz-read-write|-moz-read-only|-ms-clear|-ms-expand){/.test(
                 rule,
             )
         ) {

@@ -1,26 +1,29 @@
-import { Stack } from '@mui/material'
-import { useIntersectionObserver } from '@react-hookz/web'
 import { memo, useEffect, useRef } from 'react'
+import { useIntersectionObserver } from '@react-hookz/web'
+import { Stack, type StackProps } from '@mui/material'
 
-interface ElementAnchorProps {
+interface ElementAnchorProps extends StackProps {
     callback: (intersection: IntersectionObserverEntry | undefined) => void
-    children: React.ReactNode
 }
 
-export const ElementAnchor = memo<ElementAnchorProps>(({ callback, children }) => {
+export const ElementAnchor = memo<ElementAnchorProps>(({ callback, children, ...rest }) => {
     const elementRef = useRef<HTMLDivElement>(null)
     const intersection = useIntersectionObserver(elementRef, {
         rootMargin: '200px',
     })
 
+    const callbackRef = useRef(callback)
+    callbackRef.current = callback
     useEffect(() => {
         if (!intersection?.isIntersecting) return
-        callback(intersection)
+        callbackRef.current(intersection)
     }, [intersection])
 
     return (
-        <Stack pt={1} ref={elementRef} justifyContent="center" direction="row">
+        <Stack pt={1} ref={elementRef} justifyContent="center" alignItems="center" direction="row" {...rest}>
             {children}
         </Stack>
     )
 })
+
+ElementAnchor.displayName = 'ElementAnchor'

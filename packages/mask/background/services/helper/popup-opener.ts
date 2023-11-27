@@ -1,40 +1,15 @@
-import { DashboardRoutes, PopupRoutes } from '@masknet/shared-base'
-import urlcat from 'urlcat'
-import { MaskMessages } from '../../../shared'
+import urlcat, { type ParamMap } from 'urlcat'
+import { type DashboardRoutes, PopupRoutes, MaskMessages, type PopupRoutesParamsMap } from '@masknet/shared-base'
+import { isLocked } from '../wallet/services/index.js'
 
 let currentPopupWindowId = 0
-function isLocked() {
-    return new Promise<boolean>((resolve) => {
-        const off = MaskMessages.events.wallet_is_locked.on(([type, value]) => {
-            if (type === 'request') return
-            off()
-            resolve(value)
-            // in case something went wrong
-            setTimeout(() => resolve(false), 200)
-        })
-        MaskMessages.events.wallet_is_locked.sendToLocal(['request'])
-    })
-}
 
-const exclusionDetectLocked = [PopupRoutes.PersonaSignRequest, PopupRoutes.Unlock, PopupRoutes.ConnectWallet]
-
-export async function openPopupWindow(route?: PopupRoutes, params?: Record<string, any>): Promise<void> {
+async function openWindow(url: string): Promise<void> {
     const windows = await browser.windows.getAll()
-    const popup = windows.find((win) => win && win.type === 'popup' && win.id === currentPopupWindowId)
-
-    // Focus on the pop-up window if it already exists
+    const popup = windows.find((window) => window?.type === 'popup' && window.id === currentPopupWindowId)
     if (popup) {
-        await browser.windows.update(currentPopupWindowId, { focused: true })
+        await browser.windows.update(popup.id!, { focused: true })
     } else {
-        const locked = await isLocked()
-        const shouldUnlockWallet = locked && !exclusionDetectLocked.includes(route ?? PopupRoutes.Wallet)
-
-        const url = urlcat('popups.html#', shouldUnlockWallet ? PopupRoutes.Unlock : route ?? PopupRoutes.Wallet, {
-            toBeClose: 1,
-            from: locked && route ? route : null,
-            ...params,
-        })
-
         let left: number
         let top: number
 
@@ -42,21 +17,27 @@ export async function openPopupWindow(route?: PopupRoutes, params?: Record<strin
             const lastFocused = await browser.windows.getLastFocused()
             // Position window in top right corner of lastFocused window.
             top = lastFocused.top ?? 0
-            left = (lastFocused.left ?? 0) + (lastFocused.width ?? 0) - 350
-        } catch (error_) {
+            left = (lastFocused.left ?? 0) + (lastFocused.width ?? 0) - 400
+        } catch {
             // The following properties are more than likely 0, due to being
             // opened from the background chrome process for the extension that
             // has no physical dimensions
 
-            const { screenX, screenY, outerWidth } = window
-            top = Math.max(screenY, 0)
-            left = Math.max(screenX + (outerWidth - 350), 0)
+            // Note: DOM is only available in MV2 or MV3 page mode.
+            const { screenX, outerWidth, screenY } = globalThis as any
+            if (typeof screenX === 'number' && typeof screenY === 'number' && typeof outerWidth === 'number') {
+                top = Math.max(screenY, 0)
+                left = Math.max(screenX + (outerWidth - 400), 0)
+            } else {
+                top = 100
+                left = 100
+            }
         }
 
         const { id } = await browser.windows.create({
             url: browser.runtime.getURL(url),
-            width: 350,
-            height: 640,
+            width: 400,
+            height: 628,
             type: 'popup',
             state: 'normal',
             left,
@@ -67,20 +48,47 @@ export async function openPopupWindow(route?: PopupRoutes, params?: Record<strin
         if (id) {
             currentPopupWindowId = id
             browser.windows.onRemoved.addListener(function listener(windowID: number) {
-                if (windowID === id) {
-                    currentPopupWindowId = 0
-                }
+                if (windowID !== id) return
+                currentPopupWindowId = 0
+                browser.windows.onRemoved.removeListener(listener)
             })
-
-            // firefox bug: https://bugzilla.mozilla.org/show_bug.cgi?id=1271047
-            if (process.env.engine === 'firefox') {
-                browser.windows.update(id, {
-                    left,
-                    top,
-                })
-            }
         }
     }
+}
+async function openOrUpdatePopupWindow(route: PopupRoutes, params: ParamMap) {
+    if (!currentPopupWindowId) return openWindow(urlcat('popups.html#', route, params))
+
+    await browser.windows.update(currentPopupWindowId, { focused: true })
+    MaskMessages.events.popupRouteUpdated.sendToAll(
+        urlcat(route, {
+            close_after_unlock: true,
+            ...params,
+        }),
+    )
+}
+
+const noWalletUnlockNeeded: PopupRoutes[] = [PopupRoutes.PersonaSignRequest, PopupRoutes.Personas]
+
+export async function openPopupWindow<T extends PopupRoutes>(
+    route: T,
+    params: T extends keyof PopupRoutesParamsMap ? PopupRoutesParamsMap[T] : undefined,
+    evenWhenWalletLocked?: boolean,
+): Promise<void> {
+    if (noWalletUnlockNeeded.includes(route) || evenWhenWalletLocked || !(await isLocked())) {
+        return openOrUpdatePopupWindow(route, {
+            close_after_unlock: true,
+            ...params,
+        })
+    } else {
+        return openOrUpdatePopupWindow(PopupRoutes.Wallet, {
+            close_after_unlock: true,
+            from: urlcat(route, params as ParamMap),
+        } satisfies PopupRoutesParamsMap[PopupRoutes.Wallet])
+    }
+}
+
+export async function queryCurrentPopupWindowId() {
+    return currentPopupWindowId
 }
 
 export async function removePopupWindow(): Promise<void> {
@@ -90,8 +98,13 @@ export async function removePopupWindow(): Promise<void> {
 }
 
 export async function openDashboard(route?: DashboardRoutes, search?: string) {
-    return browser.tabs.create({
+    await browser.tabs.create({
         active: true,
         url: browser.runtime.getURL(`/dashboard.html#${route}${search ? `?${search}` : ''}`),
     })
+}
+
+export async function queryCurrentActiveTab() {
+    const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
+    return activeTab
 }

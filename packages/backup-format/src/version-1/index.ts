@@ -1,17 +1,17 @@
 import {
-    AESJsonWebKey,
-    ECKeyIdentifierFromJsonWebKey,
-    EC_Private_JsonWebKey,
-    EC_Public_JsonWebKey,
+    type AESJsonWebKey,
+    type EC_Private_JsonWebKey,
+    type EC_Public_JsonWebKey,
     isEC_Private_JsonWebKey,
-    isEC_Public_JsonWebKey,
+    isEC_JsonWebKey,
     isAESJsonWebKey,
     ProfileIdentifier,
+    ECKeyIdentifier,
 } from '@masknet/shared-base'
-import { isObjectLike } from 'lodash-unified'
-import { None, Some } from 'ts-results'
-import { createEmptyNormalizedBackup } from '../normalize'
-import type { NormalizedBackup } from '../normalize/type'
+import { isObjectLike } from 'lodash-es'
+import { None, Some } from 'ts-results-es'
+import { createEmptyNormalizedBackup } from '../normalize/index.js'
+import type { NormalizedBackup } from '../normalize/type.js'
 
 export function isBackupVersion1(obj: unknown): obj is BackupJSONFileVersion1 {
     if (!isObjectLike(obj)) return false
@@ -38,7 +38,9 @@ export async function normalizeBackupVersion1(file: BackupJSONFileVersion1): Pro
 
     const { whoami, people } = file
     for (const { network, publicKey, userId, nickname, localKey, privateKey } of [...whoami, ...(people || [])]) {
-        const identifier = ProfileIdentifier.of(network, userId).unwrap()
+        const identifier = ProfileIdentifier.of(network, userId).expect(
+            `backup should not contain invalid identifier parts ${network} and ${userId}`,
+        )
         const profile: NormalizedBackup.ProfileBackup = {
             identifier,
             nickname: nickname ? Some(nickname) : None,
@@ -48,8 +50,8 @@ export async function normalizeBackupVersion1(file: BackupJSONFileVersion1): Pro
             linkedPersona: None,
         }
 
-        if (isEC_Public_JsonWebKey(publicKey)) {
-            const personaID = await ECKeyIdentifierFromJsonWebKey(publicKey)
+        if (isEC_JsonWebKey(publicKey)) {
+            const personaID = (await ECKeyIdentifier.fromJsonWebKey(publicKey)).unwrap()
             const persona: NormalizedBackup.PersonaBackup = backup.personas.get(personaID) || {
                 identifier: personaID,
                 nickname: None,
@@ -60,6 +62,7 @@ export async function normalizeBackupVersion1(file: BackupJSONFileVersion1): Pro
                 mnemonic: None,
                 createdAt: None,
                 updatedAt: None,
+                address: None,
             }
             profile.linkedPersona = Some(personaID)
 
@@ -71,8 +74,8 @@ export async function normalizeBackupVersion1(file: BackupJSONFileVersion1): Pro
         }
         if (isAESJsonWebKey(localKey)) {
             profile.localKey = Some(localKey)
-            if (profile.linkedPersona.some && backup.personas.has(profile.linkedPersona.val)) {
-                backup.personas.get(profile.linkedPersona.val)!.localKey = Some(localKey)
+            if (profile.linkedPersona.isSome() && backup.personas.has(profile.linkedPersona.value)) {
+                backup.personas.get(profile.linkedPersona.value)!.localKey = Some(localKey)
             }
         }
     }

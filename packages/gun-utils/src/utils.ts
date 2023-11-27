@@ -1,8 +1,7 @@
 import { EventIterator } from 'event-iterator'
-import { getGunInstance, OnCloseEvent } from './instance'
+import { getGunInstance, OnCloseEvent } from './instance.js'
 
 function getGunNodeFromPath(path: string[]) {
-    // eslint-disable-next-line unicorn/no-array-reduce
     const resultNode = path.reduce((gun, path) => gun.get(path as never), getGunInstance())
     return resultNode
 }

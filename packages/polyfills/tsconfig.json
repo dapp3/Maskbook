@@ -1,13 +1,11 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.leaf.json",
   "compilerOptions": {
     "rootDir": "./",
-    "outDir": "./dist/",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "lib": ["ESNext"],
-    "emitDeclarationOnly": true
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
-  "include": ["./ecmascript", "./ecmascript-intl", "./types", "./web-apis"],
+  "include": ["./ecmascript", "./ecmascript-intl", "./web-apis"],
   // This package MUST NOT use any other package.
   "references": []
 }

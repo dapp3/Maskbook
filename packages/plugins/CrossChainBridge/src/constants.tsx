@@ -1,13 +1,13 @@
-import { PluginId } from '@masknet/plugin-infra'
+import { PluginID } from '@masknet/shared-base'
 import {
     CBridgeIcon,
     ArbitrumOneBridgeIcon,
     BobaBridgeIcon,
     PolygonBridgeIcon,
     RainbowBridgeIcon,
-} from './SNSAdaptor/MaskIcon'
+} from './SiteAdaptor/MaskIcon.js'
 
-export const PLUGIN_ID = PluginId.CrossChainBridge
+export const PLUGIN_ID = PluginID.CrossChainBridge
 export const PLUGIN_DESCRIPTION = 'A cross-chain-bridge plugin'
 export const PLUGIN_NAME = 'CrossChainBridge'
 export function getCrossChainBridge(t: Record<string, () => string>) {
@@ -39,13 +39,12 @@ export function getCrossChainBridge(t: Record<string, () => string>) {
             ID: `${PLUGIN_ID}_polygon_bridge`,
             isOfficial: true,
             icon: <PolygonBridgeIcon />,
-            link: 'https://wallet.polygon.technology/bridge/',
+            link: 'https://wallet.polygon.technology/polygon/bridge/',
         },
         {
             name: 'Rainbow Bridge',
             ID: `${PLUGIN_ID}_rainbow_bridge`,
             isOfficial: true,
-            intro: t.rainbow_bridge_intro(),
             icon: <RainbowBridgeIcon />,
             link: 'https://rainbowbridge.app/transfer',
         },

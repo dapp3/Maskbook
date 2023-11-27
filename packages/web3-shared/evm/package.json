@@ -2,45 +2,34 @@
   "name": "@masknet/web3-shared-evm",
   "private": true,
   "sideEffects": false,
+  "type": "module",
   "exports": {
     ".": {
-      "webpack": "./index.ts",
-      "default": "../dist/evm/index.js"
+      "types": "./dist/index.d.ts",
+      "mask-src": "./src/index.ts",
+      "default": "./dist/index.js"
     }
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@dimensiondev/holoflows-kit": "^0.9.0-20220520093249-0870919",
-    "@ensdomains/address-encoder": "^0.2.6",
-    "@masknet/shared-base": "workspace:*",
-    "@masknet/web3-constants": "workspace:*",
-    "@masknet/web3-contracts": "workspace:*",
-    "@masknet/web3-shared-base": "workspace:*",
-    "@toruslabs/torus-embed": "^1.22.6",
-    "@walletconnect/client": "^1.7.5",
-    "@walletconnect/qrcode-modal": "^1.7.5",
-    "bignumber.js": "9.0.2",
-    "ethereum-blockies": "^0.1.1",
-    "fortmatic": "^2.2.1",
-    "fuse.js": "^6.6.2",
-    "punycode": "^2.1.1",
-    "react-use": "^17.4.0",
-    "unstated-next": "^1.1.0",
-    "urlcat": "^2.0.4",
-    "use-subscription": "1.6.0",
-    "uuid": "^8.3.2",
-    "wallet.ts": "^1.0.1",
-    "web3": "1.7.4",
-    "web3-core": "1.7.4",
-    "web3-core-helpers": "1.7.4",
-    "web3-eth-contract": "1.7.4",
-    "web3-utils": "1.7.4"
+    "@masknet/flags": "workspace:^",
+    "@masknet/shared-base": "workspace:^",
+    "@masknet/web3-constants": "workspace:^",
+    "@masknet/web3-contracts": "workspace:^",
+    "@masknet/web3-shared-base": "workspace:^",
+    "@masknet/web3-telemetry": "workspace:^",
+    "bignumber.js": "9.1.2",
+    "date-fns": "^2.30.0",
+    "punycode": "^2.3.0",
+    "web3-core": "1.10.2",
+    "web3-core-helpers": "1.10.2",
+    "web3-eth": "1.10.2",
+    "web3-eth-abi": "1.10.2",
+    "web3-eth-accounts": "1.10.2",
+    "web3-eth-contract": "1.10.2",
+    "web3-utils": "1.10.2"
   },
   "devDependencies": {
-    "@masknet/injected-script": "*",
-    "@types/ethereum-blockies": "^0.1.0",
-    "@types/punycode": "^2.1.0",
-    "@types/use-subscription": "^1.0.0",
-    "@types/uuid": "^8.3.4"
+    "@types/punycode": "^2.1.0"
   }
 }

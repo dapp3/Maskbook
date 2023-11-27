@@ -1,19 +1,31 @@
 {
   "name": "@masknet/encryption",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
-      "webpack": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "mask-src": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@dimensiondev/secp256k1-webcrypto": "1.0.0-20220412114204-be816df",
-    "@dimensiondev/stego-js": "0.11.1-20201027083223-8ab41be",
-    "@masknet/shared-base": "workspace:*",
-    "@masknet/typed-message": "workspace:*",
-    "@msgpack/msgpack": "^2.7.2"
+    "@masknet/base": "workspace:^",
+    "@masknet/secp256k1-webcrypto": "1.0.0",
+    "@masknet/stego-js": "0.14.2",
+    "@masknet/typed-message": "workspace:^",
+    "@msgpack/msgpack": "^3.0.0-beta2"
+  },
+  "files": [
+    "src",
+    "assets",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.map"
+  ],
+  "devDependencies": {
+    "tiny-secp256k1": "^2.2.3"
   }
 }

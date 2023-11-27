@@ -1,18 +1,17 @@
-import './prepare'
+import './prepare.js'
 import type { api } from '@dimensiondev/mask-wallet-core/proto'
 // How to interact with this worker:
-export type Input = { id: number; data: api.IMWRequest }
-export type Output = { id: number; response: api.MWResponse }
+export type Input = {
+    id: number
+    data: api.IMWRequest
+}
+export type Output = {
+    id: number
+    response: api.MWResponse
+}
 
 async function load() {
-    if (process.env.manifest === '3') {
-        return import('@dimensiondev/mask-wallet-core/bundle')
-    } else {
-        const { default: init, ...rest } = await import('@dimensiondev/mask-wallet-core/web')
-        // @ts-expect-error
-        await init()
-        return rest
-    }
+    return import('@dimensiondev/mask-wallet-core/bundle')
 }
 const promise = (async () => {
     const { request } = await load()

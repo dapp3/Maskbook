@@ -1,7 +1,6 @@
 import type { TypedMessage } from '@masknet/typed-message'
-import type { ProfileIdentifier, AESCryptoKey, EC_Public_CryptoKey } from '@masknet/shared-base'
-import type { PayloadParseResult, SupportedPayloadVersions } from '../payload'
-import { registerSerializableClass } from '@masknet/shared-base'
+import type { ProfileIdentifier, AESCryptoKey, EC_Public_CryptoKey } from '@masknet/base'
+import type { PayloadParseResult, SupportedPayloadVersions } from '../payload/index.js'
 
 export interface DecryptOptions {
     message: PayloadParseResult.Payload
@@ -33,7 +32,11 @@ export interface DecryptIO {
      * @param iv
      * @returns The decrypted data
      */
-    decryptByLocalKey(authorHint: ProfileIdentifier | null, data: Uint8Array, iv: Uint8Array): Promise<Uint8Array>
+    decryptByLocalKey(
+        authorHint: ProfileIdentifier | null,
+        data: Uint8Array,
+        iv: Uint8Array,
+    ): Promise<Uint8Array | ArrayBuffer>
     /**
      * If the author is null, the host should use some heuristic approach (e.g. where they found the post).
      * @param author ProfileIdentifier of the author. Might be empty.
@@ -139,22 +142,11 @@ export enum DecryptErrorReasons {
 export class DecryptError extends Error {
     static Reasons = DecryptErrorReasons
     readonly type = DecryptProgressKind.Error
-    constructor(public override message: DecryptErrorReasons, cause: any, public recoverable = false) {
+    constructor(
+        public override message: DecryptErrorReasons,
+        cause: any,
+        public recoverable = false,
+    ) {
         super(message, { cause })
     }
 }
-registerSerializableClass(
-    'MaskDecryptError',
-    (x) => x instanceof DecryptError,
-    (e: DecryptError) => ({
-        cause: (e as any).cause,
-        recoverable: e.recoverable,
-        message: e.message,
-        stack: e.stack,
-    }),
-    (o) => {
-        const e = new DecryptError(o.message, o.cause, o.recoverable)
-        e.stack = o.stack
-        return e
-    },
-)

@@ -1,4 +1,4 @@
-import { Button, ButtonProps, styled } from '@mui/material'
+import { Button, type ButtonProps, styled } from '@mui/material'
 import { forwardRef } from 'react'
 
 const BaseTabWrap = styled(Button, {
@@ -9,23 +9,27 @@ const BaseTabWrap = styled(Button, {
     paddingRight: theme.spacing(2),
     height: 36,
     lineHeight: '18px',
-    boxShadow: activated
-        ? `0px 0px 20px ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.05)'}`
-        : 'none',
+    boxShadow:
+        activated ?
+            `0px 0px 20px ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.05)'}`
+        :   'none',
     background: activated ? theme.palette.maskColor.bottom : 'transparent',
     borderRadius: `${theme.spacing(1.5)} ${theme.spacing(1.5)} 0px 0px !important`,
-    color: activated ? theme.palette.text.primary : theme.palette.text.secondary,
+    color: activated ? theme.palette.maskColor.main : theme.palette.maskColor.secondaryDark,
     fontSize: 16,
     fontWeight: 'bold',
 
     '&:hover': {
-        color: theme.palette.text.primary,
         boxShadow: activated ? '0 0 20px rgba(0, 0, 0, 0.05)' : 'none',
         background: activated ? theme.palette.maskColor.bottom : 'transparent',
     },
+    // If there is only single one tab.
+    '&:first-of-type:last-of-type': {
+        maxWidth: '25%',
+    },
 }))
 
-export interface ButtonTabProps extends React.PropsWithChildren<Omit<ButtonProps, 'onChange' | 'value' | 'selected'>> {
+interface ButtonTabProps extends React.PropsWithChildren<Omit<ButtonProps, 'onChange' | 'value' | 'selected'>> {
     value: string
     selected?: boolean
     onChange?(event: object, value: string): void

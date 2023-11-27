@@ -1,54 +1,50 @@
 #!/usr/bin/env ts-node
-import git from '@nice-labs/git-rev'
-import zip from 'gulp-zip'
-import { extension as buildBaseVersion, ExtensionBuildArgs } from './normal'
-import { dest, src, series, parallel, TaskFunction } from 'gulp'
-import { BUILD_PATH, ROOT_PATH, task } from '../utils'
-import { codegen } from '../codegen'
-import path from 'path'
+import { fileURLToPath } from 'url'
+import { series, type TaskFunction } from 'gulp'
+import { buildBaseExtension } from './normal.js'
+import { ROOT_PATH, task } from '../utils/index.js'
+import { codegen } from '../codegen/index.js'
+import { type BuildFlagsExtended } from './flags.js'
+import { copyFile } from 'fs/promises'
+import { ManifestFile } from '../../../mask/.webpack/flags.js'
 
-export const ciBuild = series(
-    printBranchName,
+const BUILD_PATH = new URL('build/', ROOT_PATH)
+export const ciBuild: TaskFunction = series(
     codegen,
-    // The base version need to be build in serial in order to prepare webpack cache.
-    buildBaseVersion,
-    // If we build parallel on CI, it will be slower eventually
-    (process.env.CI ? series : parallel)(
-        // zip base version to zip
-        zipTo(BUILD_PATH, 'MaskNetwork.base.zip'),
-        // Chrome version is the same with base version
-        zipTo(BUILD_PATH, 'MaskNetwork.chromium.zip'),
-        buildTarget('Firefox', { firefox: true, 'output-path': 'build-firefox' }, 'MaskNetwork.firefox.zip'),
-        buildTarget('Android', { android: true, 'output-path': 'build-android' }, 'MaskNetwork.gecko.zip'),
-        buildTarget('iOS', { iOS: true, 'output-path': 'build-iOS' }, 'MaskNetwork.iOS.zip'),
-        buildTarget('Firefox', { firefox: true, 'output-path': 'build-firefox' }, 'MaskNetwork.firefox.zip'),
-        buildTarget(
-            'Chromium-beta',
-            { chromium: true, beta: true, 'output-path': 'build-chromium-beta' },
-            'MaskNetwork.chromium-beta.zip',
-        ),
-    ),
+    buildBaseExtension,
+    zipTo('MaskNetwork.chromium.zip', ManifestFile.ChromiumMV2),
+    zipTo('MaskNetwork.firefox.zip', ManifestFile.FirefoxMV2, true),
+    zipTo('MaskNetwork.firefox-mv3.zip', ManifestFile.FirefoxMV3, true),
+    zipTo('MaskNetwork.chromium-beta.zip', ManifestFile.ChromiumBetaMV2),
+    zipTo('MaskNetwork.chromium-mv3.zip', ManifestFile.ChromiumMV3),
+)
+export const buildChrome: TaskFunction = series(
+    codegen,
+    buildBaseExtension,
+    zipTo('MaskNetwork.chromium.zip', ManifestFile.ChromiumMV2),
 )
 task(ciBuild, 'build-ci', 'Build the extension on CI')
-function buildTarget(name: string, options: ExtensionBuildArgs, outFile: string) {
-    options.readonlyCache = true
-    options['output-path'] = path.join(ROOT_PATH, options['output-path']!)
-    return series(buildWith(name, options), zipTo(options['output-path']!, outFile))
-}
-function zipTo(absBuildDir: string, fileName: string): TaskFunction {
-    const f: TaskFunction = () =>
-        src(`./**/*`, { cwd: absBuildDir })
-            .pipe(zip(fileName))
-            .pipe(dest('./', { cwd: ROOT_PATH }))
-    f.displayName = `zip ${absBuildDir} into ${fileName}`
-    return f
-}
-function buildWith(name: string, buildArgs: ExtensionBuildArgs) {
-    const f: TaskFunction = () => buildBaseVersion(buildArgs)
-    f.displayName = `Build target ${name}`
-    return f
-}
+task(buildChrome, 'build-chrome', 'Build the extension for Chrome only')
 
-async function printBranchName() {
-    console.log('Building on branch: ', git.branchName())
+function zipTo(
+    fileName: string,
+    withManifestFile: BuildFlagsExtended['manifestFile'],
+    reproducible?: boolean,
+): TaskFunction {
+    const f: TaskFunction = async () => {
+        await copyFile(new URL(`manifest-${withManifestFile}.json`, BUILD_PATH), new URL('manifest.json', BUILD_PATH))
+        if (!reproducible && withManifestFile === ManifestFile.ChromiumBetaMV2) {
+            await copyFile(new URL('build-info-beta.json', BUILD_PATH), new URL('build-info.json', BUILD_PATH))
+        }
+        const { cmd } = await import('web-ext')
+        await cmd.build({
+            sourceDir: fileURLToPath(BUILD_PATH),
+            artifactsDir: fileURLToPath(ROOT_PATH),
+            filename: fileName,
+            overwriteDest: true,
+            ignoreFiles: ['*/*.map', reproducible ? 'build-info.json' : undefined!].filter(Boolean),
+        })
+    }
+    f.displayName = `Build extension zip at ${fileName}`
+    return f
 }

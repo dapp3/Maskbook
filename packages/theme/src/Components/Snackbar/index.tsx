@@ -2,102 +2,136 @@ import { forwardRef, useRef, memo, useCallback } from 'react'
 import { keyframes } from 'tss-react'
 import {
     SnackbarProvider,
-    SnackbarProviderProps,
-    SnackbarKey,
+    type SnackbarProviderProps,
+    type SnackbarKey,
     useSnackbar,
-    VariantType,
-    SnackbarMessage,
+    type VariantType,
+    type SnackbarMessage,
     SnackbarContent,
-    SnackbarAction,
-    OptionsObject,
+    type SnackbarAction,
+    type OptionsObject,
 } from 'notistack'
-import { Typography, IconButton } from '@mui/material'
-import classnames from 'classnames'
-import { Close as CloseIcon } from '@mui/icons-material'
-import WarningIcon from '@mui/icons-material/Warning'
-import InfoIcon from '@mui/icons-material/Info'
-import DoneIcon from '@mui/icons-material/Done'
-import { LoadingIcon, RiskIcon } from '@masknet/icons'
-import { makeStyles, useStylesExtends } from '../../UIHelper'
-import { MaskColorVar } from '../../CSSVariables'
+import { Typography, IconButton, alpha } from '@mui/material'
+import { Close as CloseIcon, Warning as WarningIcon, Info as InfoIcon } from '@mui/icons-material'
+import { Icons } from '@masknet/icons'
+import { makeStyles } from '../../UIHelper/index.js'
+import { MaskColorVar } from '../../CSSVariables/index.js'
+import { usePortalShadowRoot } from '../../ShadowRoot/index.js'
 
-export { PopupSnackbarProvider, usePopupCustomSnackbar } from './PopupSnackbar'
+export { PopupSnackbarProvider, usePopupCustomSnackbar } from './PopupSnackbar.js'
 export { SnackbarProvider, useSnackbar } from 'notistack'
 export type { VariantType, OptionsObject, SnackbarKey, SnackbarMessage } from 'notistack'
 
-interface StyleProps {
+export interface StyleProps {
     offsetY?: number
 }
 
-const useStyles = makeStyles<StyleProps, 'title' | 'message'>()((theme, { offsetY }, refs) => {
-    const { palette } = theme
-    const isDark = palette.mode === 'dark'
+const useStyles = makeStyles<StyleProps, 'title' | 'message'>()((theme, { offsetY }, classNames) => {
     const spinningAnimationKeyFrames = keyframes`
-to {
-  transform: rotate(360deg)
-}`
-
+        to {
+          transform: rotate(360deg)
+        }
+    `
     const title = {
-        color: MaskColorVar.textPrimary,
-        fontWeight: 400,
+        color: theme.palette.maskColor.main,
+        fontWeight: 700,
         fontSize: 14,
-        lineHeight: '20px',
+        lineHeight: '18px',
     } as const
     const message = {
-        color: MaskColorVar.textSecondary,
+        color: theme.palette.maskColor.main,
         fontWeight: 400,
         display: 'flex',
         alignItems: 'center',
-        fontSize: 12,
+        fontSize: 14,
+        lineHeight: '18px',
+        wordBreak: 'break-word',
+        '& > a': {
+            display: 'flex',
+            alignItems: 'center',
+        },
+        '& :focus:not(:focus-visible)': {
+            outline: 0,
+        },
     } as const
     const defaultVariant = {
-        background: isDark ? '#17191D' : '#F7F9FA',
-        color: isDark ? '#D9D9D9' : '#0F1419',
-        [`& .${refs.title}`]: {
-            color: isDark ? '#D9D9D9' : palette.grey['800'],
+        background: theme.palette.maskColor.bottom,
+        color: theme.palette.maskColor.main,
+        boxShadow:
+            theme.palette.mode === 'dark' ?
+                '0px 4px 30px rgba(255, 255, 255, 0.15)'
+            :   '0px 4px 30px rgba(0, 0, 0, 0.1)',
+        [`& .${classNames.title}`]: {
+            color: 'inherit',
+        },
+
+        [`& .${classNames.message}`]: {
+            color: 'inherit',
         },
     }
     const success = {
-        backgroundColor: '#60DFAB',
-        color: '#ffffff',
-        [`& .${refs.title}`]: {
+        backgroundColor: theme.palette.maskColor.success,
+        color: theme.palette.maskColor.white,
+        boxShadow: `0px 6px 20px ${alpha(theme.palette.maskColor.success, 0.15)}`,
+        backdropFilter: 'blur(16px)',
+        [`& .${classNames.title}`]: {
             color: 'inherit',
         },
-        [`& .${refs.message}`]: {
-            color: 'inherit',
+        [`& .${classNames.message}`]: {
+            color: alpha(theme.palette.maskColor.white, 0.8),
+            '& svg': {
+                color: theme.palette.maskColor.white,
+            },
         },
     } as const
 
     const error = {
-        background: '#FF5F5F',
-        color: '#ffffff',
-        [`& .${refs.title}`]: {
+        background: theme.palette.maskColor.danger,
+        color: theme.palette.maskColor.white,
+        boxShadow: `0px 6px 20px ${alpha(theme.palette.maskColor.danger, 0.15)}`,
+        backdropFilter: 'blur(16px)',
+        [`& .${classNames.title}`]: {
             color: 'inherit',
         },
-        [`& .${refs.message}`]: {
-            color: 'inherit',
+        [`& .${classNames.message}`]: {
+            color: alpha(theme.palette.maskColor.white, 0.8),
+            '& svg': {
+                color: theme.palette.maskColor.white,
+            },
         },
     } as const
 
     const info = {
-        background: '#8CA3C7',
-        color: '#ffffff',
-        [`& .${refs.title}`]: {
+        background: theme.palette.maskColor.primary,
+        color: theme.palette.maskColor.white,
+        boxShadow:
+            theme.palette.mode === 'dark' ?
+                '0px 4px 30px rgba(255, 255, 255, 0.15)'
+            :   '0px 4px 30px rgba(0, 0, 0, 0.1)',
+        [`& .${classNames.title}`]: {
             color: 'inherit',
         },
-        [`& .${refs.message}`]: {
-            color: 'inherit',
+        [`& .${classNames.message}`]: {
+            color: alpha(theme.palette.maskColor.white, 0.8),
+            '& svg': {
+                color: theme.palette.maskColor.white,
+            },
         },
     }
 
     const warning = {
-        backgroundColor: '#FFB915',
-        color: '#ffffff',
-        [`& .${refs.title}`]: {
+        backgroundColor: theme.palette.maskColor.warn,
+        color: theme.palette.maskColor.white,
+        boxShadow: `0px 6px 20px ${alpha(theme.palette.maskColor.warn, 0.15)}`,
+        backdropFilter: 'blur(16px)',
+        [`& .${classNames.title}`]: {
             color: 'inherit',
         },
-        [`& .${refs.message}`]: {
-            color: 'inherit',
+        [`& .${classNames.message}`]: {
+            color: alpha(theme.palette.maskColor.white, 0.8),
+            '& svg': {
+                color: theme.palette.maskColor.white,
+            },
         },
     } as const
 
@@ -110,28 +144,12 @@ to {
         },
         content: {
             alignItems: 'center',
-            padding: theme.spacing(1.5, 2),
+            padding: theme.spacing(2),
             borderRadius: 12,
             width: 380,
             flexWrap: 'nowrap !important' as 'nowrap',
-            [`&.${success.ref}`]: {
-                background: MaskColorVar.greenMain,
-                color: MaskColorVar.lightestBackground,
-            },
-            [`&.${error.ref}`]: {
-                background: MaskColorVar.redMain,
-                color: MaskColorVar.lightestBackground,
-                title: {
-                    color: 'inherit',
-                },
-            },
-            [`&.${info.ref}`]: {
-                color: MaskColorVar.lightestBackground,
-            },
-            [`&.${warning.ref}`]: {
-                color: '#ffffff',
-            },
         },
+        // eslint-disable-next-line tss-unused-classes/unused-classes
         default: defaultVariant,
         success,
         error,
@@ -141,6 +159,10 @@ to {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            '& > svg': {
+                width: 24,
+                height: 24,
+            },
         },
         spinning: {
             display: 'flex',
@@ -151,16 +173,16 @@ to {
         },
         closeButton: {
             color: 'inherit',
+            transform: 'translateY(-10px)',
         },
         texts: {
-            marginLeft: theme.spacing(2),
+            marginLeft: theme.spacing(1.5),
+            '& :focus:not(:focus-visible)': {
+                outline: 0,
+            },
         },
         title,
         message,
-        link: {
-            display: 'flex',
-            marginLeft: theme.spacing(0.5),
-        },
     }
 })
 
@@ -177,17 +199,20 @@ export interface CustomSnackbarContentProps {
 }
 const IconMap: Record<VariantType, React.ReactNode> = {
     default: <InfoIcon color="inherit" />,
-    success: <DoneIcon color="inherit" />,
-    error: <RiskIcon />,
+    success: <Icons.SuccessForSnackBar />,
+    error: <Icons.TransactionFailed />,
     warning: <WarningIcon color="inherit" />,
     info: <InfoIcon color="inherit" />,
 }
 
 export const CustomSnackbarContent = forwardRef<HTMLDivElement, CustomSnackbarContentProps>((props, ref) => {
-    const classes = useStylesExtends(useStyles({ offsetY: props.offsetY }), props)
+    const { classes, cx } = useStyles({ offsetY: props.offsetY }, { props })
     const snackbar = useSnackbar()
-    const loadingIcon = <LoadingIcon color="inherit" className={classes.spinning} />
-    const variantIcon = props.processing ? loadingIcon : props.variant ? IconMap[props.variant] : null
+    const loadingIcon = <Icons.CircleLoading className={classes.spinning} />
+    const variantIcon =
+        props.processing ? loadingIcon
+        : props.variant ? IconMap[props.variant]
+        : null
     let renderedAction: React.ReactNode = (
         <IconButton className={classes.closeButton} onClick={() => snackbar.closeSnackbar(props.id)}>
             <CloseIcon />
@@ -197,40 +222,49 @@ export const CustomSnackbarContent = forwardRef<HTMLDivElement, CustomSnackbarCo
         renderedAction = typeof props.action === 'function' ? props.action(props.id) : props.action
     }
     return (
-        <SnackbarContent ref={ref} className={classnames(classes.content, classes[props.variant!])}>
-            {variantIcon && <div className={classes.icon}>{variantIcon}</div>}
+        <SnackbarContent ref={ref} className={cx(classes.content, classes[props.variant!])}>
+            {variantIcon ?
+                <div className={classes.icon}>{variantIcon}</div>
+            :   null}
             <div className={classes.texts}>
                 <Typography className={classes.title} variant="h2">
                     {props.title}
                 </Typography>
-                {props.message && (
+                {props.message ?
                     <Typography className={classes.message} variant="body1">
                         {props.message}
                     </Typography>
-                )}
+                :   null}
             </div>
             <div className={classes.action}>{renderedAction}</div>
         </SnackbarContent>
     )
 })
 
-export const CustomSnackbarProvider = memo<SnackbarProviderProps & { offsetY?: number }>(({ offsetY, ...rest }) => {
+export const CustomSnackbarProvider = memo<
+    SnackbarProviderProps & {
+        offsetY?: number
+    }
+>(function CustomSnackbarProvider({ offsetY, ...rest }) {
     const ref = useRef<SnackbarProvider>(null)
     const { classes } = useStyles({ offsetY })
     const onDismiss = (key: string | number) => () => {
         ref.current?.closeSnackbar(key)
     }
 
-    return (
+    return usePortalShadowRoot((container) => (
         <SnackbarProvider
             ref={ref}
             maxSnack={30}
             disableWindowBlurListener
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             hideIconVariant
+            // this is a false positive, SnackbarProvider won't use it like it is a component.
+            // eslint-disable-next-line react/no-unstable-nested-components
             content={(key, title) => (
                 <CustomSnackbarContent id={key} variant={rest.variant ?? 'default'} title={title} offsetY={offsetY} />
             )}
+            // eslint-disable-next-line react/no-unstable-nested-components
             action={(key) => (
                 <IconButton size="large" onClick={onDismiss(key)} sx={{ color: 'inherit' }}>
                     <CloseIcon color="inherit" />
@@ -243,9 +277,10 @@ export const CustomSnackbarProvider = memo<SnackbarProviderProps & { offsetY?: n
                 variantInfo: classes.info,
                 variantWarning: classes.warning,
             }}
+            domRoot={container}
             {...rest}
         />
-    )
+    ))
 })
 
 export interface ShowSnackbarOptions

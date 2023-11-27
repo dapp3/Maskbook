@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect } from 'react'
 import { makeStyles } from '@masknet/theme'
 import { Box, Divider, Skeleton } from '@mui/material'
-import { GasOptionType, NetworkPluginID } from '@masknet/web3-shared-base'
-import { ChainId, formatGweiToWei, GasOption, Transaction } from '@masknet/web3-shared-evm'
-import { useWeb3State } from '@masknet/plugin-infra/web3'
-import { GasOption as GasOptionItem } from './GasOption'
-import { SettingsContext } from './Context'
+import { GasOptionType } from '@masknet/web3-shared-base'
+import type { ChainId, GasOption, Transaction } from '@masknet/web3-shared-evm'
+import { EVMUtils } from '@masknet/web3-providers'
+import { GasOption as GasOptionItem } from './GasOption.js'
+import { SettingsContext } from './Context.js'
 
 const useStyles = makeStyles()((theme) => {
     return {
@@ -18,7 +18,7 @@ const useStyles = makeStyles()((theme) => {
             marginTop: theme.spacing(2),
         },
         content: {
-            padding: theme.spacing(0, 2),
+            padding: theme.spacing(0.5, 2),
         },
         skeleton: {
             height: 201.5,
@@ -27,12 +27,12 @@ const useStyles = makeStyles()((theme) => {
             flexDirection: 'column',
         },
         rectangle: {
-            borderRadius: 8,
+            borderRadius: 16,
         },
     }
 })
 
-export interface GasOptionSelectorProps {
+interface GasOptionSelectorProps {
     chainId: ChainId
     options?: Record<GasOptionType, GasOption>
     onChange?: (option: Partial<Transaction>) => void
@@ -42,30 +42,29 @@ export function GasOptionSelector(props: GasOptionSelectorProps) {
     const { chainId, options, onChange } = props
     const { classes } = useStyles()
     const { gasOptionType, setGasOptionType } = SettingsContext.useContainer()
-    const { Others } = useWeb3State(NetworkPluginID.PLUGIN_EVM)
 
-    const isEIP1559 = Others?.chainResolver.isSupport(chainId, 'EIP1559')
+    const isEIP1559 = EVMUtils.chainResolver.isFeatureSupported(chainId, 'EIP1559')
 
     const onClick = useCallback(
         (type: GasOptionType, option: GasOption) => {
             setGasOptionType(type)
             onChange?.(
-                isEIP1559
-                    ? {
-                          maxFeePerGas: formatGweiToWei(option.suggestedMaxFeePerGas).toFixed(),
-                          maxPriorityFeePerGas: formatGweiToWei(option.suggestedMaxPriorityFeePerGas).toFixed(),
-                      }
-                    : {
-                          gasPrice: formatGweiToWei(option.suggestedMaxFeePerGas).toFixed(),
-                      },
+                isEIP1559 ?
+                    {
+                        maxFeePerGas: option.suggestedMaxFeePerGas,
+                        maxPriorityFeePerGas: option.suggestedMaxPriorityFeePerGas,
+                    }
+                :   {
+                        gasPrice: option.suggestedMaxFeePerGas,
+                    },
             )
         },
         [isEIP1559, onChange],
     )
 
     useEffect(() => {
-        if (!options || gasOptionType) return
-        onClick(GasOptionType.NORMAL, options[GasOptionType.NORMAL])
+        if (!options) return
+        onClick(gasOptionType, options[gasOptionType])
     }, [gasOptionType, options])
 
     if (!options)
@@ -84,6 +83,7 @@ export function GasOptionSelector(props: GasOptionSelectorProps) {
             <div className={classes.content}>
                 {Object.entries(options).map(([type, option], i) => {
                     const type_ = type as GasOptionType
+                    if (type === GasOptionType.CUSTOM) return
                     return (
                         <React.Fragment key={type}>
                             {i === 0 ? null : <Divider />}

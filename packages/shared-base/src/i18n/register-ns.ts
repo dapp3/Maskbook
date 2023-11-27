@@ -4,7 +4,8 @@ function addI18NBundle(instance: i18n, namespace: string, langs: Record<string, 
     if (!instance.addResourceBundle) throw new TypeError('Please call instance.init() first')
 
     try {
-        if (process.env.NODE_ENV === 'development') {
+        // not enable hmr for MV3
+        if (process.env.NODE_ENV === 'development' && !('importScripts' in globalThis)) {
             globalThis.addEventListener('MASK_I18N_HMR', (e) => {
                 const [ns, langs] = (e as CustomEvent).detail
                 if (namespace !== ns) return
@@ -26,6 +27,10 @@ export function createI18NBundle(namespace: string, langs: Record<string, object
     return (instance: i18n) => addI18NBundle(instance, namespace, langs)
 }
 
-function removeEmptyString(lang: object) {
-    return Object.fromEntries(Object.entries(lang).filter((x) => x[1].length))
+function removeEmptyString(lang: Partial<Record<string, string>>) {
+    const next: Partial<Record<string, string>> = {}
+    for (const key in lang) {
+        if (lang[key]) next[key] = lang[key]
+    }
+    return next
 }

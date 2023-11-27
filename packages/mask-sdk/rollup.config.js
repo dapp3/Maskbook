@@ -1,5 +1,8 @@
-import sucrase from '@rollup/plugin-sucrase'
 import node from '@rollup/plugin-node-resolve'
+import image from '@rollup/plugin-image'
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+const { swc } = require('rollup-plugin-swc3')
 
 export default {
     input: 'main/index.ts',
@@ -9,9 +12,9 @@ export default {
     },
     plugins: [
         node(),
-        sucrase({
-            exclude: ['node_modules/**'],
-            transforms: ['typescript'],
+        swc({
+            tsconfig: '../../tsconfig.json',
         }),
+        image(),
     ],
 }

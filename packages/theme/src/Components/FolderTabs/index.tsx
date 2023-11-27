@@ -1,7 +1,6 @@
-import { Children, FC, useState, HTMLProps, ReactElement } from 'react'
-import classnames from 'classnames'
-import { makeStyles } from '../../UIHelper/makeStyles'
-import { MaskColorVar } from '../../CSSVariables'
+import { Children, useState, type HTMLProps, type ComponentType, type ReactElement } from 'react'
+import { makeStyles } from '../../UIHelper/makeStyles.js'
+import { MaskColorVar } from '../../CSSVariables/index.js'
 
 const useStyles = makeStyles<void, 'selected'>()((theme, _, refs) => {
     const { palette } = theme
@@ -9,7 +8,6 @@ const useStyles = makeStyles<void, 'selected'>()((theme, _, refs) => {
     const inactiveColor = isDark ? theme.palette.grey['50'] : MaskColorVar.twitterBg
     const selected = {}
     return {
-        folderTabs: {},
         selected,
         tabList: {
             display: 'flex',
@@ -63,17 +61,19 @@ interface TabPanelProps extends HTMLProps<HTMLDivElement> {
     value?: number | string
 }
 
-export const FolderTabPanel: FC<TabPanelProps> = ({ className, ...rest }) => {
-    const { classes } = useStyles()
-    return <div className={classnames(classes.tabPanel, className)} role="tabpanel" {...rest} />
+export function FolderTabPanel({ className, ...rest }: TabPanelProps) {
+    const { classes, cx } = useStyles()
+    return <div className={cx(classes.tabPanel, className)} role="tabpanel" {...rest} />
 }
 
-type TabPanelReactElement = ReactElement<TabPanelProps, FC<TabPanelProps>>
+// this is a subtype of ReactElement
+// eslint-disable-next-line @typescript-eslint/ban-types
+type TabPanelReactElement = ReactElement<TabPanelProps, ComponentType<TabPanelProps>>
 
-interface FolderTabsProps extends HTMLProps<HTMLDivElement> {}
+interface FolderTabsProps extends Pick<HTMLProps<HTMLDivElement>, 'defaultValue' | 'children'> {}
 
-export const FolderTabs: FC<FolderTabsProps> = ({ children: childNodes, defaultValue = 0, ...rest }) => {
-    const { classes } = useStyles()
+export function FolderTabs({ children: childNodes, defaultValue = 0 }: FolderTabsProps) {
+    const { classes, cx } = useStyles()
     const [value, setValue] = useState(defaultValue)
     const tabs = Children.map(childNodes as TabPanelReactElement[], (child, index) => {
         const label = child.props.label
@@ -82,9 +82,10 @@ export const FolderTabs: FC<FolderTabsProps> = ({ children: childNodes, defaultV
         return (
             <button
                 key={label}
+                type="button"
                 tabIndex={index === 0 ? 0 : -1}
                 role="tab"
-                className={classnames(classes.tab, selected ? classes.selected : null)}
+                className={cx(classes.tab, selected ? classes.selected : null)}
                 onClick={() => setValue(childValue)}>
                 {label}
             </button>

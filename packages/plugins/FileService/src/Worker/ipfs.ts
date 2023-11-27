@@ -1,17 +1,20 @@
-import { Attachment } from '@dimensiondev/common-protocols'
-import { encodeText } from '@dimensiondev/kit'
-import { create, IPFSHTTPClient } from 'ipfs-http-client'
-import { isEmpty } from 'lodash-unified'
-import { landing } from '../constants'
 import urlcat from 'urlcat'
-import type { ProviderAgent, LandingPageMetadata, AttachmentOptions } from '../types'
-import { makeFileKeySigned } from '../helpers'
+import { isEmpty } from 'lodash-es'
+import { Attachment } from '@dimensiondev/common-protocols'
+import { encodeText } from '@masknet/kit'
+import { create, type IPFSHTTPClient } from 'ipfs-http-client'
+import { LANDING_PAGE, Provider } from '../constants.js'
+import type { ProviderAgent, LandingPageMetadata, AttachmentOptions } from '../types.js'
+import { makeFileKeySigned } from '../helpers.js'
 
 function createClient(): IPFSHTTPClient {
     return create({
         host: 'ipfs.infura.io',
         port: 5001,
         protocol: 'https',
+        headers: {
+            authorization: 'Basic MkRZaG10eThyM21DOWl5dE5tdG9ZdkdmWkxiOmM5YjVlOTRmNjM1OTdiMGEyNmJhY2RlNmI3NTgxOTgx',
+        },
     })
 }
 
@@ -40,16 +43,16 @@ class IPFSAgent implements ProviderAgent {
     }
 
     async uploadLandingPage(metadata: LandingPageMetadata) {
-        const linkPrefix = 'https://ipfs.infura.io/ipfs'
+        const linkPrefix = 'https://mask.infura-ipfs.io/ipfs'
         const encodedMetadata = JSON.stringify({
             name: metadata.name,
             size: metadata.size,
-            provider: 'ipfs',
+            provider: Provider.IPFS,
             link: urlcat(linkPrefix, '/:txId', { txId: metadata.txId }),
             signed: await makeFileKeySigned(metadata.key),
             createdAt: new Date().toISOString(),
         })
-        const response = await fetch(landing)
+        const response = await fetch(LANDING_PAGE)
         const text = await response.text()
         const replaced = text
             .replace('Arweave', IPFSAgent.providerName)

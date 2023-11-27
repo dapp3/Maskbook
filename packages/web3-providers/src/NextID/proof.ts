@@ -1,21 +1,192 @@
-import { deleteCache, fetchJSON } from './helper'
 import urlcat from 'urlcat'
-import { first } from 'lodash-unified'
+import { first, sortBy, uniqBy } from 'lodash-es'
 import {
-    BindingProof,
-    fromHex,
-    NextIDAction,
-    NextIDBindings,
-    NextIDPayload,
-    NextIDPersonaBindings,
     NextIDPlatform,
+    fromHex,
     toBase64,
+    type BindingProof,
+    NextIDAction,
+    type NextIDBindings,
+    type NextIDErrorBody,
+    type NextIDIdentity,
+    type NextIDPayload,
+    type NextIDPersonaBindings,
+    type NextIDEnsRecord,
+    createBindingProofFromProfileQuery,
+    EMPTY_LIST,
+    getDomainSystem,
 } from '@masknet/shared-base'
-import type { NextIDBaseAPI } from '../types'
-import { PROOF_BASE_URL_DEV, PROOF_BASE_URL_PROD } from './constants'
+import { PROOF_BASE_URL_DEV, PROOF_BASE_URL_PROD, RELATION_SERVICE_URL } from './constants.js'
+import { staleNextIDCached } from './helpers.js'
+import PRESET_LENS from './preset-lens.json'
+import { fetchJSON, fetchSquashedJSON } from '../helpers/fetchJSON.js'
+import type { NextIDBaseAPI } from '../entry-types.js'
+import { stableSquashedCached } from '../entry-helpers.js'
+import { env } from '@masknet/flags'
 
 const BASE_URL =
-    process.env.channel === 'stable' && process.env.NODE_ENV === 'production' ? PROOF_BASE_URL_PROD : PROOF_BASE_URL_DEV
+    env.channel === 'stable' && process.env.NODE_ENV === 'production' ? PROOF_BASE_URL_PROD : PROOF_BASE_URL_DEV
+
+function relationServiceDomainQuery(depth?: number) {
+    return `domain(domainSystem: $domainSystem, name: $domain) {
+    source
+    system
+    name
+    fetcher
+    resolved {
+      identity
+      platform
+      displayName
+    }
+    owner {
+      identity
+      platform
+      displayName
+      uuid
+      nft(category: ["ENS"], limit: 100, offset: 0) {
+        uuid
+        category
+        chain
+        id
+      }
+      neighborWithTraversal(depth: ${depth ?? 5}) {
+        ... on ProofRecord {
+          source
+          from {
+            nft(category: ["ENS"], limit: 100, offset: 0) {
+              uuid
+              category
+              chain
+              id
+            }
+            uuid
+            platform
+            identity
+            displayName
+          }
+          to {
+            nft(category: ["ENS"], limit: 100, offset: 0) {
+              uuid
+              category
+              chain
+              id
+            }
+            uuid
+            platform
+            identity
+            displayName
+          }
+        }
+        ... on HoldRecord {
+          source
+          from {
+            nft(category: ["ENS"], limit: 100, offset: 0) {
+              uuid
+              category
+              chain
+              id
+            }
+            uuid
+            platform
+            identity
+            displayName
+          }
+          to {
+            nft(category: ["ENS"], limit: 100, offset: 0) {
+              uuid
+              category
+              chain
+              id
+            }
+            uuid
+            platform
+            identity
+            displayName
+          }
+        }
+      }
+    }
+    }`
+}
+
+function relationServiceIdentityQuery(depth?: number) {
+    return `
+    identity(platform: $platform, identity: $identity) {
+        platform
+        identity
+        displayName
+        uuid
+        ownedBy {
+          uuid
+          platform
+          identity
+          displayName
+        }
+        nft(category: ["ENS"], limit: 100, offset: 0) {
+          uuid
+          category
+          chain
+          address
+          id
+        }
+        neighborWithTraversal(depth: ${depth ?? 5}) {
+          ... on ProofRecord {
+            source
+            from {
+              nft(category: ["ENS"], limit: 100, offset: 0) {
+                uuid
+                category
+                chain
+                id
+              }
+              uuid
+              platform
+              identity
+              displayName
+            }
+            to {
+              nft(category: ["ENS"], limit: 100, offset: 0) {
+                uuid
+                category
+                chain
+                id
+              }
+              uuid
+              platform
+              identity
+              displayName
+            }
+          }
+          ... on HoldRecord {
+            source
+            from {
+              nft(category: ["ENS"], limit: 100, offset: 0) {
+                uuid
+                category
+                chain
+                id
+              }
+              uuid
+              platform
+              identity
+              displayName
+            }
+            to {
+              nft(category: ["ENS"], limit: 100, offset: 0) {
+                uuid
+                category
+                chain
+                id
+              }
+              uuid
+              platform
+              identity
+              displayName
+            }
+          }
+        }
+      }`
+}
 
 interface CreatePayloadBody {
     action: string
@@ -27,28 +198,53 @@ interface CreatePayloadBody {
 type PostContentLanguages = 'default' | 'zh_CN'
 
 interface CreatePayloadResponse {
-    post_content: { [key in PostContentLanguages]: string }
+    post_content: {
+        [key in PostContentLanguages]: string
+    }
     sign_payload: string
     uuid: string
     created_at: string
 }
 
-const getPersonaQueryURL = (platform: string, identity: string) =>
-    urlcat(BASE_URL, '/v1/proof', {
+interface RestorePubkeyResponse {
+    /** hex public key */
+    public_key: string
+}
+
+type NeighborNode = {
+    source: NextIDPlatform
+    to: NextIDIdentity
+    from: NextIDIdentity
+}
+type NeighborList = NeighborNode[]
+
+function getPersonaQueryURL(platform: string, identity: string) {
+    return urlcat(BASE_URL, '/v1/proof', {
         platform,
         identity,
     })
+}
 
-const getExistedBindingQueryURL = (platform: string, identity: string, personaPublicKey: string) =>
-    urlcat(BASE_URL, '/v1/proof/exists', {
+function getExistedBindingQueryURL(platform: string, identity: string, personaPublicKey: string) {
+    return urlcat(BASE_URL, '/v1/proof/exists', {
         platform,
         identity,
         public_key: personaPublicKey,
     })
+}
 
-export class NextIDProofAPI implements NextIDBaseAPI.Proof {
-    // TODO: remove 'bind' in project for business context.
-    async bindProof(
+export class NextIDProof {
+    static fetchFromProofService<T>(request: Request | RequestInfo, init?: RequestInit) {
+        return fetchJSON<T>(request, init)
+    }
+
+    static async clearPersonaQueryCache(personaPublicKey: string) {
+        const url = getPersonaQueryURL(NextIDPlatform.NextID, personaPublicKey)
+        await staleNextIDCached(url)
+        await stableSquashedCached(url)
+    }
+
+    static async bindProof(
         uuid: string,
         personaPublicKey: string,
         action: NextIDAction,
@@ -75,68 +271,274 @@ export class NextIDProofAPI implements NextIDBaseAPI.Proof {
             created_at: createdAt,
         }
 
-        const result = await fetchJSON(urlcat(BASE_URL, '/v1/proof'), {
+        const result = await fetchJSON<NextIDErrorBody | undefined>(urlcat(BASE_URL, '/v1/proof'), {
             body: JSON.stringify(requestBody),
             method: 'POST',
         })
+
+        if (result?.message) throw new Error(result.message)
 
         // Should delete cache when proof status changed
         const cacheKeyOfQueryPersona = getPersonaQueryURL(NextIDPlatform.NextID, personaPublicKey)
         const cacheKeyOfQueryPlatform = getPersonaQueryURL(platform, identity)
         const cacheKeyOfExistedBinding = getExistedBindingQueryURL(platform, identity, personaPublicKey)
-        deleteCache(cacheKeyOfQueryPersona)
-        deleteCache(cacheKeyOfQueryPlatform)
-        deleteCache(cacheKeyOfExistedBinding)
 
-        return result
+        await staleNextIDCached(cacheKeyOfExistedBinding)
+        await staleNextIDCached(cacheKeyOfQueryPersona)
+        await staleNextIDCached(cacheKeyOfQueryPlatform)
+
+        await stableSquashedCached(cacheKeyOfQueryPersona)
+        await stableSquashedCached(cacheKeyOfQueryPlatform)
+        await stableSquashedCached(cacheKeyOfExistedBinding)
     }
 
-    async queryExistedBindingByPersona(personaPublicKey: string, enableCache?: boolean) {
-        const url = getPersonaQueryURL(NextIDPlatform.NextID, personaPublicKey)
-        const response = await fetchJSON<NextIDBindings>(url, {}, enableCache)
+    static async queryExistedBindingByPersona(personaPublicKey: string) {
+        const { ids } = await this.fetchFromProofService<NextIDBindings>(
+            getPersonaQueryURL(NextIDPlatform.NextID, personaPublicKey),
+            undefined,
+        )
         // Will have only one item when query by personaPublicKey
-        return first(response.unwrap().ids)
+        return first(ids)
     }
 
-    async queryExistedBindingByPlatform(platform: NextIDPlatform, identity: string, page?: number) {
+    static async queryExistedBindingByPlatform(platform: NextIDPlatform, identity: string, page = 1, exact = true) {
         if (!platform && !identity) return []
 
-        const response = await fetchJSON<NextIDBindings>(
-            urlcat(BASE_URL, '/v1/proof', { platform, identity, page }),
-            undefined,
-            true,
+        const response = await this.fetchFromProofService<NextIDBindings>(
+            urlcat(BASE_URL, '/v1/proof', {
+                platform,
+                identity,
+                page,
+                exact,
+                // TODO workaround for the API, and will sort the result manually
+            }),
         )
 
-        // TODO: merge Pagination into this
-        return response.unwrap().ids
+        return sortBy(response.ids, (x) => -x.activated_at)
     }
-    async queryAllExistedBindingsByPlatform(platform: NextIDPlatform, identity: string) {
+
+    static async queryLatestBindingByPlatform(
+        platform: NextIDPlatform,
+        identity: string,
+        publicKey?: string,
+    ): Promise<NextIDPersonaBindings | null> {
+        if (!platform && !identity) return null
+
+        const result = await this.queryAllExistedBindingsByPlatform(platform, identity, true)
+        if (publicKey) return result.find((x) => x.persona === publicKey) ?? null
+        return first(result) ?? null
+    }
+
+    static async queryAllExistedBindingsByPlatform(platform: NextIDPlatform, identity: string, exact?: boolean) {
+        if (!platform && !identity) return []
+
         const nextIDPersonaBindings: NextIDPersonaBindings[] = []
-        let page = 0
+        let page = 1
         do {
-            const personaBindings = await this.queryExistedBindingByPlatform(platform, identity, page)
+            const result = await this.fetchFromProofService<NextIDBindings>(
+                urlcat(BASE_URL, '/v1/proof', {
+                    platform,
+                    identity,
+                    exact,
+                    page,
+                    order: 'desc',
+                }),
+                undefined,
+            )
+            const personaBindings = result.ids
             if (personaBindings.length === 0) return nextIDPersonaBindings
             nextIDPersonaBindings.push(...personaBindings)
+
+            // next is `0` if current page is the last one.
+            if (result.pagination.next === 0) return nextIDPersonaBindings
+
             page += 1
-        } while (page > 0)
+        } while (page > 1)
         return []
     }
 
-    async queryIsBound(personaPublicKey: string, platform: NextIDPlatform, identity: string, enableCache?: boolean) {
-        if (!platform && !identity) return false
+    static async queryIsBound(personaPublicKey: string, platform: NextIDPlatform, identity: string) {
+        try {
+            if (!platform && !identity) return false
 
-        const url = getExistedBindingQueryURL(platform, identity, personaPublicKey)
-        const result = await fetchJSON<BindingProof>(url, {}, enableCache)
-
-        return result.map(() => true).unwrapOr(false)
+            const result = await this.fetchFromProofService<BindingProof | undefined>(
+                getExistedBindingQueryURL(platform, identity, personaPublicKey),
+                undefined,
+            )
+            return !!result?.is_valid
+        } catch {
+            return false
+        }
     }
 
-    async createPersonaPayload(
+    static async queryProfilesByDomain(domain?: string, depth?: number) {
+        const domainSystem = getDomainSystem(domain)
+        if (domainSystem === 'unknown') return EMPTY_LIST
+        const { data } = await fetchSquashedJSON<{
+            data: {
+                domain: {
+                    owner: {
+                        neighborWithTraversal: NeighborList
+                        nft: NextIDEnsRecord[]
+                    }
+                } | null
+            }
+        }>(RELATION_SERVICE_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({
+                operationName: 'GET_PROFILES_QUERY',
+                variables: { domainSystem, domain: domain?.toLowerCase() },
+                query: `
+                    query GET_PROFILES_QUERY($domainSystem:String, $domain: String) {
+                      ${relationServiceDomainQuery(depth)}
+                    }
+                `,
+            }),
+        })
+
+        if (!data.domain) return EMPTY_LIST
+        const bindings = createBindProofsFromNeighbor(data.domain.owner.neighborWithTraversal)
+        return bindings.filter((x) => ![NextIDPlatform.NextID].includes(x.platform) && x.identity)
+    }
+
+    static async queryProfilesByAddress(address: string, depth?: number) {
+        const { data } = await fetchSquashedJSON<{
+            data: {
+                identity: {
+                    nft: NextIDEnsRecord[]
+                    neighborWithTraversal: NeighborList
+                }
+            }
+        }>(RELATION_SERVICE_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({
+                operationName: 'GET_PROFILES_QUERY',
+                variables: { platform: NextIDPlatform.Ethereum, identity: address.toLowerCase() },
+                query: `
+                    query GET_PROFILES_QUERY($platform: String, $identity: String) {
+                       ${relationServiceIdentityQuery(depth)}
+                      }
+                `,
+            }),
+        })
+
+        const bindings = createBindProofsFromNeighbor(data.identity.neighborWithTraversal)
+        return bindings.filter(
+            (x) => ![NextIDPlatform.Ethereum, NextIDPlatform.NextID].includes(x.platform) && x.identity,
+        )
+    }
+
+    static async queryProfilesByPublicKey(publicKey: string, depth?: number) {
+        const { data } = await fetchJSON<{
+            data: {
+                identity: {
+                    nft: NextIDEnsRecord[]
+                    neighborWithTraversal: NeighborList
+                }
+            }
+        }>(RELATION_SERVICE_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({
+                operationName: 'GET_PROFILES_QUERY',
+                variables: { platform: NextIDPlatform.NextID, identity: publicKey },
+                query: `
+                    query GET_PROFILES_QUERY($platform: String, $identity: String) {
+                       ${relationServiceIdentityQuery(depth)}
+                      }
+                `,
+            }),
+        })
+        const bindings = createBindProofsFromNeighbor(data.identity.neighborWithTraversal)
+        return bindings
+    }
+
+    static async queryProfilesByTwitterId(twitterId: string, depth?: number) {
+        const { data } = await fetchSquashedJSON<{
+            data: {
+                identity: {
+                    nft: NextIDEnsRecord[]
+                    neighborWithTraversal: NeighborList
+                }
+            }
+        }>(RELATION_SERVICE_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({
+                operationName: 'GET_PROFILES_BY_TWITTER_ID',
+                variables: { platform: NextIDPlatform.Twitter, identity: twitterId.toLowerCase() },
+                query: `
+                        query GET_PROFILES_BY_TWITTER_ID($platform: String, $identity: String) {
+                            ${relationServiceIdentityQuery(depth)}
+                        }
+                `,
+            }),
+        })
+        const bindings = createBindProofsFromNeighbor(data.identity.neighborWithTraversal)
+        return bindings.filter((x) => ![NextIDPlatform.NextID].includes(x.platform) && x.identity)
+    }
+
+    static async queryAllLens(twitterId: string, depth?: number): Promise<NextIDBaseAPI.LensAccount[]> {
+        const lowerCaseId = twitterId.toLowerCase()
+        const { data } = await fetchSquashedJSON<{
+            data: {
+                domain: {
+                    owner: {
+                        neighborWithTraversal: NeighborList
+                    }
+                } | null
+            }
+        }>(RELATION_SERVICE_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({
+                operationName: 'GET_LENS_PROFILES',
+                variables: { domainSystem: 'lens', domain: lowerCaseId },
+                query: `
+                        query GET_LENS_PROFILES($domainSystem: String, $domain: String) {
+                            ${relationServiceDomainQuery(depth)}
+                        }
+                `,
+            }),
+        })
+
+        const connectionsTo =
+            data.domain?.owner.neighborWithTraversal.filter((x) => x.to.platform === NextIDPlatform.LENS) || []
+
+        const connectionsFrom =
+            data.domain?.owner.neighborWithTraversal.filter((x) => x.from.platform === NextIDPlatform.LENS) || []
+
+        const id = lowerCaseId as keyof typeof PRESET_LENS
+        if (connectionsTo.length === 0 && connectionsFrom.length === 0 && PRESET_LENS[id]) {
+            return PRESET_LENS[id]
+        }
+
+        return uniqBy(
+            connectionsTo
+                .map((x) => ({
+                    handle: x.to.identity,
+                    displayName: x.to.displayName,
+                    address: x.to.identity,
+                }))
+                .concat(
+                    connectionsFrom.map((x) => ({
+                        handle: x.from.identity,
+                        displayName: x.from.displayName,
+                        address: x.from.identity,
+                    })),
+                ),
+            (x) => x.handle,
+        )
+    }
+
+    static async createPersonaPayload(
         personaPublicKey: string,
         action: NextIDAction,
         identity: string,
         platform: NextIDPlatform,
-        language?: string,
+        language: string = 'default',
     ): Promise<NextIDPayload | null> {
         const requestBody: CreatePayloadBody = {
             action,
@@ -145,20 +547,64 @@ export class NextIDProofAPI implements NextIDBaseAPI.Proof {
             public_key: personaPublicKey,
         }
 
-        const nextIDLanguageFormat = language?.replace('-', '_') as PostContentLanguages
+        const nextIDLanguageFormat = language.replace('-', '_') as PostContentLanguages
 
         const response = await fetchJSON<CreatePayloadResponse>(urlcat(BASE_URL, '/v1/proof/payload'), {
             body: JSON.stringify(requestBody),
             method: 'POST',
         })
 
-        return response
-            .map((x) => ({
-                postContent: x.post_content[nextIDLanguageFormat ?? 'default'] ?? x.post_content.default,
-                signPayload: JSON.stringify(JSON.parse(x.sign_payload)),
-                createdAt: x.created_at,
-                uuid: x.uuid,
-            }))
-            .unwrapOr(null)
+        return response ?
+                {
+                    postContent: response.post_content[nextIDLanguageFormat] ?? response.post_content.default,
+                    signPayload: JSON.stringify(JSON.parse(response.sign_payload)),
+                    createdAt: response.created_at,
+                    uuid: response.uuid,
+                }
+            :   null
     }
+
+    static async restorePubkey(payload: string, platform: NextIDPlatform, identity: string) {
+        const url = urlcat(BASE_URL, '/v1/proof/restore_pubkey')
+        const response = await fetchJSON<RestorePubkeyResponse>(url, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: NextIDAction.Create,
+                platform,
+                identity,
+                proof_post: payload,
+            }),
+        })
+        return response.public_key
+    }
+}
+
+function createBindingProofNodeFromNeighbor(nextIDIdentity: NextIDIdentity, source: NextIDPlatform) {
+    const nft = nextIDIdentity.nft.map((x) =>
+        createBindingProofFromProfileQuery(NextIDPlatform.NextID, x.id, x.id, undefined, NextIDPlatform.ENS),
+    )
+    return createBindingProofFromProfileQuery(
+        nft.length === 0 ? nextIDIdentity.platform : NextIDPlatform.ENS,
+        nextIDIdentity.identity,
+        nextIDIdentity.displayName,
+        undefined,
+        source,
+        nft,
+    )
+}
+
+function createBindProofsFromNeighbor(neighborList: NeighborList): BindingProof[] {
+    const bindings = neighborList.flatMap((x) => {
+        return [
+            {
+                uuid: x.from.uuid,
+                data: createBindingProofNodeFromNeighbor(x.from, x.source),
+            },
+            {
+                uuid: x.to.uuid,
+                data: createBindingProofNodeFromNeighbor(x.to, x.source),
+            },
+        ]
+    })
+    return uniqBy(bindings, (x) => x.uuid).map((x) => x.data)
 }

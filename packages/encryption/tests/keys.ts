@@ -1,10 +1,9 @@
 /* cspell:disable */
-import './setup'
-import { test } from '@jest/globals'
-import type { AESCryptoKey, EC_Private_CryptoKey, EC_Public_CryptoKey, ProfileIdentifier } from '@masknet/shared-base'
-import { type EC_Key, EC_KeyCurveEnum } from '../src/payload'
-import { importEC_Key } from '../src/utils'
-import { unreachable } from '@dimensiondev/kit'
+import { test } from 'vitest'
+import type { AESCryptoKey, EC_Private_CryptoKey, EC_Public_CryptoKey, ProfileIdentifier } from '@masknet/base'
+import { type EC_Key, EC_KeyCurve, importEC_Key } from '../src/index.js'
+import { unreachable } from '@masknet/kit'
+import { None, type Option, Some } from 'ts-results-es'
 test('test keys', () => {})
 
 const alice_K256_publicKey = {
@@ -122,12 +121,12 @@ export function getRandomValues() {
     }
 }
 
-export async function queryTestPublicKey(id: ProfileIdentifier) {
-    if (id.userId === 'alice') return toPublic(alice_K256_publicKey)
-    if (id.userId === 'bob') return toPublic(bob_k256_private)
-    if (id.userId === 'jack') return toPublic(jack_k256_private)
-    if (id.userId === 'joey') return toPublic(joey_k256_private)
-    return null
+export async function queryTestPublicKey(id: ProfileIdentifier): Promise<Option<EC_Key<EC_Public_CryptoKey>>> {
+    if (id.userId === 'alice') return Some(await toPublic(alice_K256_publicKey))
+    if (id.userId === 'bob') return Some(await toPublic(bob_k256_private))
+    if (id.userId === 'jack') return Some(await toPublic(jack_k256_private))
+    if (id.userId === 'joey') return Some(await toPublic(joey_k256_private))
+    return None
 }
 
 type Person = 'bob' | 'jack' | 'joey'
@@ -156,11 +155,13 @@ export function deriveAESKey(as: Person, type: 'array' | 'single') {
 async function toPublic({
     d,
     ...key
-}: typeof alice_K256_publicKey & { d?: string }): Promise<EC_Key<EC_Public_CryptoKey>> {
-    const x = await importEC_Key(key, EC_KeyCurveEnum.secp256k1)
-    return { algr: EC_KeyCurveEnum.secp256k1, key: x.unwrap() as EC_Public_CryptoKey }
+}: typeof alice_K256_publicKey & {
+    d?: string
+}): Promise<EC_Key<EC_Public_CryptoKey>> {
+    const x = await importEC_Key(key, EC_KeyCurve.secp256k1)
+    return { algr: EC_KeyCurve.secp256k1, key: x.unwrap() as EC_Public_CryptoKey }
 }
 async function toPrivate(key: typeof jack_k256_private) {
-    const x = await importEC_Key(key, EC_KeyCurveEnum.secp256k1)
-    return { algr: EC_KeyCurveEnum.secp256k1, key: x.unwrap() as EC_Private_CryptoKey }
+    const x = await importEC_Key(key, EC_KeyCurve.secp256k1)
+    return { algr: EC_KeyCurve.secp256k1, key: x.unwrap() as EC_Private_CryptoKey }
 }

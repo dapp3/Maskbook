@@ -7,14 +7,17 @@
   },
   "files": [
     "index.ts",
-    "Base.ts",
+    "BaseInjected.ts",
+    "Browser.ts",
     "Phantom.ts",
     "Solflare.ts",
     "Coin98.ts",
+    "Coinbase.ts",
     "MetaMask.ts",
-    "MathWallet.ts",
-    "WalletLink.ts",
+    "OKX.ts",
+    "Opera.ts",
+    "Clover.ts",
     "utils.ts"
   ],
-  "references": [{ "path": "../shared/" }]
+  "references": [{ "path": "../shared/tsconfig.json" }]
 }

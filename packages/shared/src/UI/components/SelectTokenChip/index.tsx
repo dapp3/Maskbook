@@ -1,14 +1,10 @@
-import classNames from 'classnames'
-import { Chip, ChipProps, CircularProgress } from '@mui/material'
-import { makeStyles, useStylesExtends } from '@masknet/theme'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ErrorIcon from '@mui/icons-material/Error'
-import { noop } from 'lodash-unified'
-import { useSharedI18N } from '../../../locales'
-import { TokenIcon } from '../TokenIcon'
-import type { Web3Helper } from '@masknet/plugin-infra/web3'
-import type { FungibleToken } from '@masknet/web3-shared-base'
-import type { ChainId, SchemaType } from '@masknet/web3-shared-evm'
+import { noop } from 'lodash-es'
+import { Chip, type ChipProps } from '@mui/material'
+import { LoadingBase, makeStyles } from '@masknet/theme'
+import { ExpandMore as ExpandMoreIcon, Error as ErrorIcon } from '@mui/icons-material'
+import { useSharedTrans } from '../../../locales/index.js'
+import { TokenIcon } from '../TokenIcon/index.js'
+import type { Web3Helper } from '@masknet/web3-helpers'
 
 const useStyles = makeStyles()((theme) => {
     return {
@@ -35,7 +31,7 @@ const useStyles = makeStyles()((theme) => {
 })
 
 export interface SelectTokenChipProps extends withClasses<'chip' | 'tokenIcon' | 'noToken'> {
-    token?: FungibleToken<ChainId, SchemaType> | null
+    token?: Web3Helper.FungibleTokenAll | null
     error?: Error
     loading?: boolean
     readonly?: boolean
@@ -45,14 +41,14 @@ export interface SelectTokenChipProps extends withClasses<'chip' | 'tokenIcon' |
 
 // todo: merge into one with SelectTokenChip
 export function SelectTokenChip(props: SelectTokenChipProps) {
-    const t = useSharedI18N()
+    const t = useSharedTrans()
     const { token, error, loading = false, readonly = false, ChipProps, chainId } = props
-    const classes = useStylesExtends(useStyles(), props)
+    const { classes, cx } = useStyles(undefined, { props })
     if (loading)
         return (
             <Chip
-                className={classNames(classes.chip, classes.loadingChip)}
-                icon={<CircularProgress size={16} />}
+                className={cx(classes.chip, classes.loadingChip)}
+                icon={<LoadingBase size={16} />}
                 size="small"
                 clickable={false}
                 variant="outlined"
@@ -61,7 +57,7 @@ export function SelectTokenChip(props: SelectTokenChipProps) {
     if (!token)
         return (
             <Chip
-                className={classNames(classes.chip, classes.noToken)}
+                className={cx(classes.chip, classes.noToken)}
                 label={t.select_token()}
                 size="small"
                 clickable={!readonly}
@@ -90,7 +86,7 @@ export function SelectTokenChip(props: SelectTokenChipProps) {
             className={classes.chip}
             icon={
                 <TokenIcon
-                    classes={{ icon: classes.tokenIcon }}
+                    className={classes.tokenIcon}
                     address={token.address}
                     name={token.name}
                     logoURL={token.logoURL}

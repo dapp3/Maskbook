@@ -1,12 +1,12 @@
+import { useContext, useEffect } from 'react'
 import createEmotionCache, { type EmotionCache } from '@emotion/cache'
 import { CacheProvider as EmotionCacheProvider } from '@emotion/react'
-import { TssCacheProvider } from 'tss-react'
-import { StyleSheet } from './ShadowRootStyleSheet'
-import { StyleSheetsContext } from './Contexts'
+import { StyleSheet } from './ShadowRootStyleSheet.js'
+import { PreventShadowRootEventPropagationListContext, stopPropagation, StyleSheetsContext } from './Contexts.js'
 
-/** @internal */
-export interface ShadowRootStyleProviderProps extends React.PropsWithChildren<{}> {
+interface ShadowRootStyleProviderProps extends React.PropsWithChildren<{}> {
     shadow: ShadowRoot
+    preventPropagation: boolean
 }
 /**
  * @internal
@@ -18,34 +18,35 @@ export interface ShadowRootStyleProviderProps extends React.PropsWithChildren<{}
  */
 export function ShadowRootStyleProvider(props: ShadowRootStyleProviderProps) {
     const { shadow, children } = props
-    const [mui, tss, sheets] = getShadowRootEmotionCache(shadow)
+    const [cache, sheets] = getShadowRootEmotionCache(shadow)
+
+    const preventEventPropagationList = useContext(PreventShadowRootEventPropagationListContext)
+    useEffect(() => {
+        if (!props.preventPropagation) return
+        preventEventPropagationList.forEach((event) => shadow.addEventListener(event, stopPropagation))
+        return () => preventEventPropagationList.forEach((event) => shadow.removeEventListener(event, stopPropagation))
+    }, [props.preventPropagation, preventEventPropagationList, shadow])
+
     return (
         <StyleSheetsContext.Provider value={sheets}>
-            <EmotionCacheProvider value={mui}>
-                <TssCacheProvider value={tss}>{children}</TssCacheProvider>
-            </EmotionCacheProvider>
+            <EmotionCacheProvider value={cache}>{children}</EmotionCacheProvider>
         </StyleSheetsContext.Provider>
     )
 }
 
-const styleSheetMap = new WeakMap<ShadowRoot, [EmotionCache, EmotionCache, [StyleSheet, StyleSheet]]>()
+const styleSheetMap = new WeakMap<ShadowRoot, [EmotionCache, StyleSheet]>()
 
 function getShadowRootEmotionCache(shadow: ShadowRoot) {
     if (styleSheetMap.has(shadow)) return styleSheetMap.get(shadow)!
 
     // emotion doesn't allow numbers appears in the key
-    const instanceID = Math.random().toString(36).slice(2).replace(/\d/g, 'x').slice(0, 4)
-    const keyA = 'mui-' + instanceID
-    const keyB = 'tss-' + instanceID
+    const instanceID = Math.random().toString(36).slice(2).replaceAll(/\d/g, 'x').slice(0, 4)
+    const key = 'css-' + instanceID
 
-    const muiEmotionCache = createEmotionCache({ key: keyA })
-    const muiStyleSheet = new StyleSheet({ key: keyA, container: shadow })
+    const muiEmotionCache = createEmotionCache({ key })
+    const muiStyleSheet = new StyleSheet({ key, container: shadow })
     muiEmotionCache.sheet = muiStyleSheet
 
-    const tssEmotionCache = createEmotionCache({ key: keyB })
-    const tssStyleSheet = new StyleSheet({ key: keyB, container: shadow })
-    tssEmotionCache.sheet = tssStyleSheet
-
-    styleSheetMap.set(shadow, [muiEmotionCache, tssEmotionCache, [muiStyleSheet, tssStyleSheet]])
+    styleSheetMap.set(shadow, [muiEmotionCache, muiStyleSheet])
     return styleSheetMap.get(shadow)!
 }

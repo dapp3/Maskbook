@@ -1,31 +1,37 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { useState, useRef, useLayoutEffect, useContext } from 'react'
+import { type DetailedHTMLProps, type HTMLAttributes, useContext, useLayoutEffect, useRef, useState } from 'react'
+import { Flags } from '@masknet/flags'
 import { createPortal } from 'react-dom'
-import { DisableShadowRootContext } from './Contexts'
-import { ShadowRootStyleProvider } from './ShadowRootStyleProvider'
+import { DisableShadowRootContext } from './Contexts.js'
+import { ShadowRootStyleProvider } from './ShadowRootStyleProvider.js'
+
+type RootElement = HTMLDivElement | HTMLSpanElement
+
+interface Props extends DetailedHTMLProps<HTMLAttributes<RootElement>, RootElement> {
+    /** Tag name */
+    rootElement?: 'div' | 'span' | (() => RootElement)
+}
 
 /**
  * Render it's children inside a ShadowRoot to provide style isolation.
  */
-export function ShadowRootIsolation({
-    children,
-    ...props
-}: React.DetailedHTMLProps<React.HTMLAttributes<HTMLSpanElement>, HTMLSpanElement>) {
+export function ShadowRootIsolation({ children, rootElement = 'div', ...props }: Props) {
     const disabled = useRef(useContext(DisableShadowRootContext)).current
 
     if (disabled) return <span {...props}>{children}</span>
 
-    const [dom, setDOM] = useState<HTMLSpanElement | null>()
+    const [dom, setDOM] = useState<RootElement | null>()
+    const container = useRef<RootElement>()
 
-    const container = useRef<HTMLDivElement>()
     if (!container.current) {
-        container.current = document.createElement('div')
+        container.current = typeof rootElement === 'function' ? rootElement() : document.createElement(rootElement)
     }
     useLayoutEffect(() => {
         if (!dom) return
         if (dom.shadowRoot) return
 
-        const shadow = dom.attachShadow({ mode: 'open' })
+        // Note: ShadowRootIsolation is expected to use inside other closed ShadowRoot
+        const shadow = dom.attachShadow({ ...Flags.shadowRootInit, mode: 'open', delegatesFocus: false })
         shadow.appendChild(container.current!)
     }, [dom])
 
@@ -33,7 +39,7 @@ export function ShadowRootIsolation({
 
     return (
         <span {...props}>
-            <ShadowRootStyleProvider shadow={dom.shadowRoot}>
+            <ShadowRootStyleProvider preventPropagation={false} shadow={dom.shadowRoot}>
                 {createPortal(children, container.current)}
             </ShadowRootStyleProvider>
         </span>

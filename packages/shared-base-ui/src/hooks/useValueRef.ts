@@ -1,31 +1,21 @@
-import { useMemo } from 'react'
-import { Subscription, useSubscription } from 'use-subscription'
-import type { ValueRef } from '@dimensiondev/holoflows-kit'
+import { useSyncExternalStore } from 'react'
+import type { ValueRef, ValueRefJSON } from '@masknet/shared-base'
 
-export function useValueRef<T>(ref: ValueRef<T>) {
-    const subscription = useMemo<Subscription<T>>(
-        () => ({
-            getCurrentValue: () => ref.value,
-            subscribe: (callback) => ref.addListener(callback),
-        }),
-        [ref],
+function getServerSnapshot(): never {
+    throw new Error('getServerSnapshot is not supported')
+}
+export function useValueRef<T>(ref: ValueRef<T>): Readonly<T> {
+    return useSyncExternalStore(
+        (f) => ref.addListener(f),
+        () => ref.value,
+        getServerSnapshot,
     )
-
-    return useSubscription(subscription)
 }
 
-export function useValueRefDelayed<T>(ref: ValueRef<T>, latency = 500) {
-    const subscription = useMemo<Subscription<T>>(
-        () => ({
-            getCurrentValue: () => ref.value,
-            subscribe: (callback: (newVal: T, oldVal: T) => void) => {
-                return ref.addListener((newVal, oldVal) => {
-                    setTimeout(() => callback(newVal, oldVal), latency)
-                })
-            },
-        }),
-        [ref, latency],
+/** @deprecated */
+export function useValueRefJSON<T extends object>(ref: ValueRefJSON<T>): Readonly<T> {
+    return useSyncExternalStore(
+        (f) => ref.addListener(f),
+        () => ref.asJSON,
     )
-
-    return useSubscription(subscription)
 }

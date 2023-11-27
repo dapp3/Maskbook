@@ -1,10 +1,12 @@
 {
   "name": "@masknet/gun-utils",
   "private": true,
+  "sideEffects": false,
   "type": "module",
   "exports": {
     ".": {
-      "webpack": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "mask-src": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },

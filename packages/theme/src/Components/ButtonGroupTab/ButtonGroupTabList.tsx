@@ -1,7 +1,7 @@
-import { ButtonGroup, ButtonGroupProps, Tab } from '@mui/material'
-import { useTabContext, getPanelId, getTabId } from '@mui/lab/TabContext'
+import { ButtonGroup, type ButtonGroupProps, Tab } from '@mui/material'
+import { useTabContext, getPanelId, getTabId } from '@mui/lab'
 import { forwardRef, cloneElement, Children, isValidElement } from 'react'
-import { ButtonTab } from './ButtonGroupTab'
+import { ButtonTab } from './ButtonGroupTab.js'
 export interface ButtonGroupTabListProps
     extends React.PropsWithChildren<Pick<ButtonGroupProps, 'classes' | 'disabled' | 'fullWidth' | 'size'>> {
     onChange(event: object, value: string): void
@@ -58,3 +58,5 @@ export const ButtonGroupTabList = forwardRef<HTMLDivElement, ButtonGroupTabListP
         </ButtonGroup>
     )
 })
+
+ButtonGroupTabList.displayName = 'ButtonGroupTabList'

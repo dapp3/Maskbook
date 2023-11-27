@@ -1,15 +1,9 @@
-import { i18NextInstance, TranslateOptions } from '@masknet/shared-base'
+import { i18NextInstance } from '@masknet/shared-base'
+import type { TFunction } from 'i18next'
 import type en from '../locales/en-US.json'
 
-// Deprecates. Prefer useMaskI18n()
-export const i18n = {
-    t: ((key, options) => {
-        return i18NextInstance.t(key, options)
-    }) as I18NFunction,
+declare let f: TFunction<any>
+/** @deprecated Prefer useMaskTrans() */
+export const i18n = i18NextInstance as {
+    t: typeof f<keyof typeof en, {}, string>
 }
-
-export type I18NFunction = <TKeys extends keyof typeof en>(
-    key: TKeys | TKeys[],
-    // defaultValue?: string,
-    options?: TranslateOptions | string,
-) => typeof en[TKeys]

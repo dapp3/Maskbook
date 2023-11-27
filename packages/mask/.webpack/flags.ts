@@ -1,56 +1,114 @@
 import type { Configuration } from 'webpack'
-import type { BuildFlags } from '../../scripts/src/extension/normal'
-export type { BuildFlags, Runtime } from '../../scripts/src/extension/normal'
+import { join, isAbsolute, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-export type NormalizedFlags = ReturnType<typeof normalizeBuildFlags>
-export function normalizeBuildFlags(flags: BuildFlags) {
-    const { mode = 'development', runtime, profiling = false, readonlyCache = false, outputPath, channel } = flags
-    let { hmr = !process.env.NO_HMR && mode === 'development', reactRefresh = hmr, reproducibleBuild = false } = flags
+const __dirname = fileURLToPath(dirname(import.meta.url))
 
-    // Firefox requires reproducible build when reviewing the uploaded source code.
-    if (runtime.engine === 'firefox' && mode === 'production') reproducibleBuild = true
+export enum ManifestFile {
+    ChromiumMV2 = 'chromium-mv2',
+    ChromiumBetaMV2 = 'chromium-beta-mv2',
+    ChromiumMV3 = 'chromium-mv3',
+    FirefoxMV2 = 'firefox-mv2',
+    FirefoxMV3 = 'firefox-mv3',
+    SafariMV3 = 'safari-mv3',
+}
+export interface BuildFlags {
+    /** If this field is set, manifest.json will copy the content of manifest-*.json */
+    manifestFile?: ManifestFile
+    mode: 'development' | 'production'
+    /** @default 'stable' */
+    channel?: 'stable' | 'beta' | 'insider'
+    /** @default false */
+    profiling?: boolean
+    /** @default true in development */
+    hmr?: boolean
+    /** @default true in development and hmr is true */
+    reactRefresh?: boolean
+    outputPath?: string
+    /** @default true */
+    devtools?: boolean
+    /** @default "vscode://file/{path}:{line}" */
+    devtoolsEditorURI?: string
+    /** @default true */
+    sourceMapPreference?: boolean | string
+    /** @default true */
+    sourceMapHideFrameworks?: boolean | undefined
+}
+export type NormalizedFlags = Required<BuildFlags>
+export function normalizeBuildFlags(flags: BuildFlags): NormalizedFlags {
+    const {
+        mode,
+        profiling = false,
+        channel = 'stable',
+        devtoolsEditorURI = 'vscode://file/{path}:{line}',
+        sourceMapHideFrameworks = true,
+        manifestFile = ManifestFile.ChromiumMV2,
+    } = flags
+    let {
+        hmr = mode === 'development',
+        reactRefresh = hmr,
+        devtools = mode === 'development' || channel !== 'stable',
+        sourceMapPreference = mode === 'development',
+        outputPath = join(__dirname, '../../../', mode === 'development' ? 'dist' : 'build'),
+    } = flags
+    if (!isAbsolute(outputPath)) outputPath = join(__dirname, '../../../', outputPath)
 
-    // CSP of Twitter bans connection to the HMR server and blocks the app to start.
-    if (runtime.engine === 'firefox') hmr = false
-
-    // React-devtools conflicts with react-refresh
-    // https://github.com/facebook/react/issues/20377
-    if (profiling) reactRefresh = false
-
-    //#region Invariant
     if (mode === 'production') hmr = false
+    if (profiling) {
+        hmr = false
+        devtools = false
+    }
     if (!hmr) reactRefresh = false
-    //#endregion
 
     return {
         mode,
-        runtime,
-        hmr,
-        profiling,
-        reactRefresh,
-        readonlyCache,
-        reproducibleBuild,
-        outputPath,
         channel,
-    } as const
+        outputPath,
+        // Runtime
+        manifestFile,
+        // DX
+        hmr,
+        reactRefresh,
+        sourceMapPreference,
+        sourceMapHideFrameworks,
+        devtools,
+        devtoolsEditorURI,
+        // CI / profiling
+        profiling,
+    }
 }
 
-export function computedBuildFlags(flags: ReturnType<typeof normalizeBuildFlags>) {
-    const { runtime, mode } = flags
+export interface ComputedFlags {
+    sourceMapKind: Configuration['devtool']
+    reactProductionProfiling: boolean
+}
+
+export function computedBuildFlags(
+    flags: Pick<Required<BuildFlags>, 'mode' | 'sourceMapPreference' | 'profiling' | 'manifestFile'>,
+): ComputedFlags {
     let sourceMapKind: Configuration['devtool'] = false
-    let supportWebAssembly = true
-    let lockdown = mode === 'development' && runtime.engine !== 'firefox'
-    if (runtime.engine === 'safari' && runtime.architecture === 'app') {
-        // Due to webextension-polyfill, eval on iOS is async.
-        sourceMapKind = false
-    } else if (runtime.manifest === 3 && mode === 'development') {
-        // MV3 does not allow eval even in production
-        sourceMapKind = 'inline-cheap-source-map'
-        supportWebAssembly = false
-    } else if (mode === 'development') {
-        sourceMapKind = 'eval-cheap-source-map'
-    } else {
-        sourceMapKind = false
+    if (flags.mode === 'production') sourceMapKind = 'source-map'
+
+    if (flags.sourceMapPreference) {
+        if (flags.manifestFile.includes('3')) sourceMapKind = 'inline-cheap-source-map'
+        else sourceMapKind = 'eval-cheap-source-map'
+
+        if (flags.mode === 'production') sourceMapKind = 'source-map'
+        if (typeof flags.sourceMapPreference === 'string') sourceMapKind = flags.sourceMapPreference
+        if (process.env.CI) sourceMapKind = false
     }
-    return { sourceMapKind, lockdown, supportWebAssembly } as const
+
+    const reactProductionProfiling = flags.profiling
+    return { sourceMapKind, reactProductionProfiling }
+}
+
+export function computeCacheKey(flags: Required<BuildFlags>, computedFlags: ComputedFlags) {
+    return [
+        '1',
+        'node' + process.version,
+        flags.mode,
+        computedFlags.reactProductionProfiling, // it will affect module resolution of react-dom
+        flags.devtools, // it will affect module resolution of react-refresh-webpack-plugin/client/ReactRefreshEntry.js
+        flags.reactRefresh, // it will affect all TSX files
+    ].join('-')
 }

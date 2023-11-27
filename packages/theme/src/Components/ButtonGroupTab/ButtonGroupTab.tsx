@@ -1,4 +1,4 @@
-import { Button, ButtonProps, styled } from '@mui/material'
+import { Button, type ButtonProps, styled } from '@mui/material'
 import { forwardRef } from 'react'
 
 const TabButtonWrap = styled(Button)(({ theme }) => ({
@@ -6,7 +6,7 @@ const TabButtonWrap = styled(Button)(({ theme }) => ({
     paddingRight: theme.spacing(2),
     flex: 1,
 }))
-export interface ButtonTabProps extends React.PropsWithChildren<Omit<ButtonProps, 'onChange' | 'value' | 'selected'>> {
+interface ButtonTabProps extends React.PropsWithChildren<Omit<ButtonProps, 'onChange' | 'value' | 'selected'>> {
     value: string
     selected?: boolean
     onChange?(event: object, value: string): void

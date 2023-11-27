@@ -6,8 +6,9 @@ import type {
     ProfileIdentifier,
     RelationFavor,
     PostIVIdentifier,
+    ECKeyIdentifier,
 } from '@masknet/shared-base'
-import type { Option } from 'ts-results'
+import type { Option } from 'ts-results-es'
 
 // All optional type in this file is marked by Option<T> because we don't want to miss any field.
 export namespace NormalizedBackup {
@@ -39,6 +40,7 @@ export namespace NormalizedBackup {
         nickname: Option<string>
         createdAt: Option<Date>
         updatedAt: Option<Date>
+        address: Option<string>
     }
     export interface Mnemonic {
         words: string
@@ -54,13 +56,13 @@ export namespace NormalizedBackup {
         updatedAt: Option<Date>
     }
     export interface RelationBackup {
-        profile: ProfileIdentifier
+        profile: ProfileIdentifier | ECKeyIdentifier
         persona: PersonaIdentifier
         favor: RelationFavor
     }
     export interface PostBackup {
         identifier: PostIVIdentifier
-        postBy?: ProfileIdentifier
+        postBy: Option<ProfileIdentifier>
         postCryptoKey: Option<AESJsonWebKey>
         recipients: Option<PostReceiverPublic | PostReceiverE2E>
         foundAt: Date
@@ -85,6 +87,8 @@ export namespace NormalizedBackup {
     export interface WalletBackup {
         address: string
         name: string
+        mnemonicId: Option<string>
+        derivationPath: Option<string>
         passphrase: Option<string>
         publicKey: Option<EC_Public_JsonWebKey>
         privateKey: Option<EC_Private_JsonWebKey>

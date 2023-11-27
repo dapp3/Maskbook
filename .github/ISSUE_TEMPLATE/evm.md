@@ -6,7 +6,7 @@ labels: ''
 assignees: DimensionDev/dev-smartcontract
 ---
 
-Request to depoly contracts on <!-- Replace it with the chain name -->.
+Request to deploy contracts on <!-- Replace it with the chain name -->.
 
 <!-- If you are working on a bounty please link to the issue here. -->
 
@@ -17,8 +17,7 @@ Request to depoly contracts on <!-- Replace it with the chain name -->.
 | Name         | \- |
 | ChainId      | \- |
 | Website      | \- |
-| RPC Endponit | \- |
-
+| RPC Endpoint | \- |
 
 ## Checklist
 

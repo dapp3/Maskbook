@@ -1,11 +1,2 @@
-export * from './entry'
-export { createInjectHooksRenderer } from './utils/createInjectHooksRenderer'
-export {
-    PluginI18NFieldRender,
-    type PluginI18NFieldRenderProps,
-    type PluginWrapperComponent,
-    type PluginWrapperMethods,
-    useActivatedPlugin,
-    usePluginI18NField,
-    usePluginWrapper,
-} from './hooks'
+export * from './entry.js'
+export * from './dom/index.js'

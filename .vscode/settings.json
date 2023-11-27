@@ -1,7 +1,13 @@
 {
+    "eslint.experimental.useFlatConfig": true,
     "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.preferences.importModuleSpecifierEnding": "js",
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "file",
+    "explorer.fileNesting.patterns": {
+        "README.md": ".commitlintrc*, .ecrc, .markdownlint*, .node-version, .npm*, .prettier*, .unlock*, .ignore, CNAME, gulp*, LICENSE, lint-staged*, cspell*, svgo*, *.ts, crowdin*",
+        "package.json": "pnpm-*.yaml, .pnpmfile.cjs"
+    },
     "editor.codeActionsOnSave": {
         "source.fixAll": true
     },
@@ -12,11 +18,11 @@
             "url": "http://json.schemastore.org/tsconfig"
         },
         {
-            "fileMatch": ["/packages/mask/src/manifest.json"],
+            "fileMatch": ["/packages/mask/.webpack/manifest/*.json"],
             "url": "http://json.schemastore.org/chrome-manifest"
         },
         {
-            "fileMatch": ["/packages/mask/src/plugins/*/schema.json"],
+            "fileMatch": ["/packages/plugins/*/schema.json"],
             "url": "http://json-schema.org/draft-07/schema"
         },
         {
@@ -24,7 +30,6 @@
             "url": "/.vscode/schema/constants.json"
         }
     ],
-    "cSpell.words": ["Reificated"],
     "files.associations": {
         "**/.env/*": "ini"
     },

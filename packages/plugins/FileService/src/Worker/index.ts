@@ -1,13 +1,14 @@
 import type { Plugin } from '@masknet/plugin-infra'
-import { None, Result, Some } from 'ts-results'
-import { base } from '../base'
-import type { FileInfo } from '../types'
-import { getAllFiles, setFileInfo, setupDatabase } from './database'
-import './rpc'
+import { None, Result, Some } from 'ts-results-es'
+import { base } from '../base.js'
+import type { FileInfo } from '../types.js'
+import { getAllFiles, setFileInfo, setupDatabase } from './database.js'
 
 const worker: Plugin.Worker.Definition = {
     ...base,
     init(signal, context) {
+        context.startService(import('./service.js').then(({ upload, ...rest }) => rest))
+        context.startGeneratorService(import('./service.js').then(({ upload }) => ({ upload })))
         setupDatabase(context.getDatabaseStorage())
     },
     backup: {
@@ -20,7 +21,6 @@ const worker: Plugin.Worker.Definition = {
         onRestore: async (files: FileInfo[]) => {
             return Result.wrap(() => {
                 files.map(async (file) => {
-                    file.createdAt = new Date(file.createdAt)
                     await setFileInfo(file)
                 })
             })

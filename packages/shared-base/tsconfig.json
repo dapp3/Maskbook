@@ -6,6 +6,10 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["./src", "./src/**/*.json"],
-  // Only type-level dependency.
-  "references": [{ "path": "../public-api" }, { "path": "../typed-message/base" }]
+  "references": [
+    { "path": "../base/tsconfig.json" },
+    { "path": "../encryption/tsconfig.json" },
+    { "path": "../public-api/tsconfig.json" },
+    { "path": "../typed-message/base/tsconfig.json" }
+  ]
 }

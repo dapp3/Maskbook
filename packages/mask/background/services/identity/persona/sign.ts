@@ -1,74 +1,58 @@
+import { v4 as uuid } from 'uuid'
+import { timeout } from '@masknet/kit'
+import { Signer } from '@masknet/web3-providers'
 import {
-    keccakFromString,
-    ecsign,
-    bufferToHex,
-    toRpcSig,
-    toCompactSig,
-    privateToPublic,
-    publicToAddress,
-    ECDSASignature,
-} from 'ethereumjs-util'
-import { MaskMessages } from '../../../../shared'
-import { PersonaIdentifier, fromBase64URL, PopupRoutes, ECKeyIdentifier } from '@masknet/shared-base'
-import { queryPersonasWithPrivateKey } from '../../../../background/database/persona/db'
-import { openPopupWindow } from '../../../../background/services/helper'
-import { delay, encodeText } from '@dimensiondev/kit'
-export interface SignRequest {
-    /** Use that who to sign this message. */
-    identifier?: PersonaIdentifier
-    /** The message to be signed. */
-    message: string
-    /** Use what method to sign this message? */
-    method: 'eth'
-}
-export interface SignRequestResult {
-    /** The persona user selected to sign the message */
-    persona: PersonaIdentifier
-    signature: {
-        raw: ECDSASignature
-        EIP2098: string
-        signature: string
+    type PersonaIdentifier,
+    fromBase64URL,
+    PopupRoutes,
+    type ECKeyIdentifier,
+    type SignType,
+    MaskMessages,
+} from '@masknet/shared-base'
+import { queryPersonasWithPrivateKey } from '../../../database/persona/web.js'
+import { openPopupWindow } from '../../helper/popup-opener.js'
+
+/**
+ * Generate a signature w or w/o confirmation from user
+ */
+export async function signWithPersona(
+    type: SignType,
+    message: unknown,
+    identifier?: ECKeyIdentifier,
+    source?: string,
+    silent = false,
+): Promise<string> {
+    const getIdentifier = async () => {
+        if (!identifier || !silent) {
+            const requestID = uuid()
+            await openPopupWindow(PopupRoutes.PersonaSignRequest, {
+                message: JSON.stringify(message),
+                requestID,
+                identifier: identifier?.toText(),
+                source,
+            })
+
+            return timeout(
+                new Promise<PersonaIdentifier>((resolve, reject) => {
+                    MaskMessages.events.personaSignRequest.on((approval) => {
+                        if (approval.requestID !== requestID) return
+                        if (!approval.selectedPersona)
+                            reject(new Error('The user refused to sign message with persona.'))
+                        resolve(approval.selectedPersona!)
+                    })
+                }),
+                60 * 1000,
+                'Timeout of signing with persona.',
+            )
+        }
+        return identifier
     }
-    /** Persona converted to a wallet address */
-    address: string
-    /** Message in hex */
-    messageHex: string
-}
 
-export async function signWithPersona({ message, method, identifier }: SignRequest): Promise<SignRequestResult> {
-    if (method !== 'eth') throw new Error('Unknown sign method')
-    const requestID = Math.random().toString(16).slice(3)
-    await openPopupWindow(PopupRoutes.PersonaSignRequest, { message, requestID, identifier: identifier?.toText() })
+    const identifier_ = await getIdentifier()
 
-    const waitForApprove = new Promise<PersonaIdentifier>((resolve, reject) => {
-        delay(1000 * 60).then(() => reject(new Error('Timeout')))
-        MaskMessages.events.personaSignRequest.on((approval) => {
-            if (approval.requestID !== requestID) return
-            if (!approval.selectedPersona) reject(new Error('Persona Rejected'))
-            resolve(approval.selectedPersona!)
-        })
-    })
-    const signer = await waitForApprove
-    return generateSignResult(signer, message)
-}
+    // find the persona with the signer's identifier
+    const persona = (await queryPersonasWithPrivateKey()).find((x) => x.identifier === identifier_)
+    if (!persona?.privateKey.d) throw new Error('Persona not found')
 
-export async function generateSignResult(signer: ECKeyIdentifier, message: string) {
-    const persona = (await queryPersonasWithPrivateKey()).find((x) => x.identifier === signer)
-    if (!persona) throw new Error('Persona not found')
-
-    const length = encodeText(message).length
-    const messageHash = keccakFromString(`\x19Ethereum Signed Message:\n${length}${message}`, 256)
-    const privateKey = Buffer.from(fromBase64URL(persona.privateKey.d!))
-    const signature = ecsign(messageHash, privateKey)
-
-    return {
-        persona: persona.identifier,
-        signature: {
-            raw: signature,
-            signature: toRpcSig(signature.v, signature.r, signature.s),
-            EIP2098: toCompactSig(signature.v, signature.r, signature.s),
-        },
-        address: bufferToHex(publicToAddress(privateToPublic(privateKey))),
-        messageHex: bufferToHex(Buffer.from(new TextEncoder().encode(message))),
-    }
+    return Signer.sign(type, Buffer.from(fromBase64URL(persona.privateKey.d)), message)
 }

@@ -1,0 +1,88 @@
+import { delay } from '@masknet/kit'
+import { isSameAddress } from '@masknet/web3-shared-base'
+import { ECKeyIdentifier, InMemoryStorages, NetworkPluginID, type StorageItem } from '@masknet/shared-base'
+import { type ProviderType, isValidAddress } from '@masknet/web3-shared-evm'
+import { BaseHostedProvider } from './BaseHosted.js'
+import * as SmartPayBundler from /* webpackDefer: true */ '../../../SmartPay/index.js'
+import type { BundlerAPI, WalletAPI } from '../../../entry-types.js'
+
+/**
+ * EIP-4337 compatible smart contract based wallet.
+ */
+export abstract class BaseEIP4337WalletProvider extends BaseHostedProvider {
+    protected Bundler: BundlerAPI.Provider = SmartPayBundler.SmartPayBundler
+
+    private ownerStorage:
+        | StorageItem<{
+              account: string
+              identifier: string
+          }>
+        | undefined
+
+    constructor(protected override providerType: ProviderType) {
+        super(providerType)
+    }
+
+    override async setup(context?: WalletAPI.IOContext) {
+        await super.setup(context)
+
+        this.ownerStorage = InMemoryStorages.Web3.createSubScope(
+            `${NetworkPluginID.PLUGIN_EVM}_${this.providerType}_owner`,
+            {
+                value: {
+                    account: this.options.getDefaultAccount(),
+                    // empty string means EOA signer
+                    identifier: '',
+                },
+            },
+        )?.storage.value
+
+        await this.ownerStorage?.initializedPromise
+
+        this.subscription.wallets?.subscribe(async () => {
+            if (!this.hostedAccount) return
+            const target = this.wallets?.find((x) => isSameAddress(x.address, this.hostedAccount))
+            const smartPayChainId = await this.Bundler.getSupportedChainId()
+            if (target?.owner) {
+                await this.ownerStorage?.setValue({
+                    account: target.owner,
+                    identifier: target.identifier ?? '',
+                })
+                if (this.hostedChainId !== smartPayChainId) {
+                    await this.switchChain(smartPayChainId)
+                }
+            }
+        })
+    }
+
+    get ownerAccount() {
+        return this.ownerStorage?.value.account ?? this.options.getDefaultAccount()
+    }
+
+    get ownerIdentifier() {
+        const identifier = ECKeyIdentifier.from(this.ownerStorage?.value.identifier).unwrapOr(undefined)
+        return identifier?.rawPublicKey === 'EMPTY' ? undefined : identifier
+    }
+
+    override async switchAccount(account?: string, owner?: { account: string; identifier?: ECKeyIdentifier }) {
+        await super.switchAccount(account)
+
+        if (!owner || !isValidAddress(owner.account)) {
+            await this.ownerStorage?.setValue({
+                account: this.options.getDefaultAccount(),
+                identifier: owner?.identifier?.toText() ?? '',
+            })
+        } else {
+            // delay for syncing storage
+            await delay(300)
+
+            // ensure account switching is successful
+            if (!isSameAddress(this.hostedAccount, account)) return
+
+            await this.ownerStorage?.setValue({
+                account: owner.account,
+                identifier: owner.identifier?.toText() ?? '',
+            })
+        }
+    }
+}

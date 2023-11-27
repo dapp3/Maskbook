@@ -1,13 +1,13 @@
+import { gunServers } from './server.js'
 declare const Gun: typeof import('gun')
-import { gunServers } from './server'
 
-export type GunRoot = ReturnType<typeof createGun>
+type GunRoot = ReturnType<typeof createGun>
 let gun: GunRoot | undefined
 export function getGunInstance(): GunRoot {
     if (gun) return gun
     return (gun = createGun())
 }
-export const OnCloseEvent = new Set<Function>()
+export const OnCloseEvent = new Set<() => void>()
 
 function createGun() {
     class WebSocket extends globalThis.WebSocket {
@@ -36,7 +36,7 @@ function createGun() {
         }
         private declare abort: () => void
         private declare keepAlive: () => void
-        declare timer: NodeJS.Timer | undefined
+        declare timer: ReturnType<typeof setTimeout> | undefined
         override send(data: any) {
             this.keepAlive()
             super.send(data)

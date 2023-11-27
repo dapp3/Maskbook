@@ -1,6 +1,7 @@
 import type { Plugin } from '@masknet/plugin-infra'
-import { FileInfoV1ToV2 } from '../helpers'
-import type { FileInfo, FileInfoV1 } from '../types'
+import { compareDesc } from 'date-fns'
+import { migrateFileInfoV1 } from '../helpers.js'
+import type { FileInfo, FileInfoV1 } from '../types.js'
 
 type DatabaseTypes = FileInfo | FileInfoV1
 
@@ -11,35 +12,42 @@ export function setupDatabase(_: typeof Database) {
 }
 
 let migrationDone = false
-async function migrationV1_V2() {
+async function migrationV1() {
+    if (!Database) return
     if (migrationDone) return
     for await (const x of Database.iterate_mutate('arweave')) {
-        await Database.add(FileInfoV1ToV2(x.value))
+        for (const file of migrateFileInfoV1(x.value)) {
+            await Database.add({
+                ...file,
+                createdAt: typeof file.createdAt !== 'number' ? new Date(file.createdAt).getTime() : file.createdAt,
+            })
+        }
         await x.delete()
     }
     migrationDone = true
 }
 
 export async function getAllFiles() {
-    await migrationV1_V2()
+    await migrationV1()
     const files: FileInfo[] = []
     for await (const { value } of Database.iterate('file')) {
         files.push(value)
     }
-    return files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-}
-
-export async function getRecentFiles() {
-    const files = await getAllFiles()
-    return files.slice(0, 4)
-}
-
-export async function getFileInfo(checksum: string) {
-    await migrationV1_V2()
-    return Database.get('file', checksum)
+    return files.sort((a, b) => compareDesc(new Date(a.createdAt), new Date(b.createdAt)))
 }
 
 export async function setFileInfo(info: FileInfo) {
-    await migrationV1_V2()
+    await migrationV1()
     return Database.add(info)
+}
+
+export async function renameFile(id: string, newName: string) {
+    const file = await Database.get('file', id)
+    if (!file) throw new Error("File to rename doesn't exist")
+    await Database.remove('file', id)
+    Database.add({ ...file, name: newName })
+}
+
+export async function deleteFile(id: string) {
+    await Database.remove('file', id)
 }

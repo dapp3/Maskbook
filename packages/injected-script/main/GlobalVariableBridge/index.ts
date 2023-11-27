@@ -1,77 +1,104 @@
-import { apply } from '../intrinsic'
-import { clone_into, handlePromise, sendEvent } from '../utils'
-import type { InternalEvents } from '../../shared'
+import { $, $safe, $unsafe } from '../intrinsic.js'
+import { handlePromise, sendEvent } from '../utils.js'
+import type { InternalEvents } from '../../shared/index.js'
 
 const hasListened: Record<string, boolean> = { __proto__: null! }
-const { has } = Reflect
-const { Promise, setTimeout } = window
-const { resolve } = Promise
-const { split } = String.prototype
-const { shift } = Array.prototype
+const __unsafe__window = $unsafe.unwrapXRayVision(window)
 
-function read(path: string) {
-    const fragments = apply(split, path, ['.' as any])
-    let result: any = window
-    while (fragments.length !== 0) {
-        try {
-            const key = apply(shift, fragments, [])
-            result = key ? result[key] : result
-        } catch {
-            return
-        }
-    }
-    return result
+interface Ref extends NullPrototype {
+    __unsafe__this: object
+    __unsafe__value: unknown
 }
 
-export function access(path: string, id: number, property: string) {
-    handlePromise(id, () => {
-        const item = read(path)[property]
+function __unsafe__Get(path: string): Ref | undefined {
+    const fragments = $.setPrototypeOf($.StringSplit(path, '.' as any), $safe.ArrayPrototype)
+    let __unsafe__this: any = __unsafe__window
+    let __unsafe__value: unknown = __unsafe__window
 
-        // the public key cannot transfer correctly between pages, since stringify it manually
+    for (const fragment of fragments) {
+        if (__unsafe__this === undefined || __unsafe__this === null) return undefined
+
+        try {
+            if (fragment === '__metamask__') {
+                __unsafe__value = __unsafe__window.ethereum?.providerMap?.get('MetaMask') || __unsafe__window.ethereum
+                __unsafe__this = __unsafe__window
+            } else {
+                __unsafe__this = __unsafe__value
+                __unsafe__value = __unsafe__this[fragment]
+            }
+        } catch {
+            return undefined
+        }
+    }
+    return { __unsafe__this, __unsafe__value, __proto__: null }
+}
+
+export function __unsafe__getValue(path: string, id: number, property: string) {
+    handlePromise(id, () => {
+        const ref = __unsafe__Get(path + '.' + property)
+        if (!ref) return
+        const { __unsafe__value } = ref
+
+        // the public key cannot transfer correctly between pages, therefore stringify it manually
         if (path === 'solflare' && property === 'publicKey') {
-            return item.toBase58()
+            try {
+                return (__unsafe__value as any).toBase58()
+            } catch {}
         }
 
-        return item
+        return __unsafe__value
     })
 }
 
-export function callRequest(path: string, id: number, request: unknown) {
-    handlePromise(id, () => read(path).request(request))
+export function __unsafe__call(path: string, id: number, ...args: unknown[]) {
+    $.setPrototypeOf(args, $safe.ArrayPrototype)
+    handlePromise(id, () => {
+        const ref = __unsafe__Get(path)
+        if (!ref) return
+        const { __unsafe__this, __unsafe__value } = ref
+        if (typeof __unsafe__value !== 'function') return
+        return $.apply(__unsafe__value, __unsafe__this, $unsafe.structuredCloneFromSafe(args))
+    })
 }
 
-export function execute(path: string, id: number, ...args: unknown[]) {
-    handlePromise(id, () => read(path)(...args))
+export function __unsafe__callRequest(path: string, id: number, request: unknown) {
+    __unsafe__call(path + '.request', id, $unsafe.structuredCloneFromSafe({ request }).request)
 }
 
-export function bindEvent(path: string, bridgeEvent: keyof InternalEvents, event: string) {
-    if (hasListened[event]) return
-    hasListened[event] = true
-    read(path).on(
-        event,
-        clone_into((...args: any[]) => {
-            // TODO: type unsound
-            sendEvent(bridgeEvent, path, event, args)
-        }),
-    )
+export function __unsafe__onEvent(path: string, bridgeEvent: keyof InternalEvents, event: string) {
+    if (hasListened[`${path}_${event}`]) return
+    hasListened[`${path}_${event}`] = true
+    try {
+        const ref = __unsafe__Get(path + '.on')
+        if (!ref) return
+        const { __unsafe__this, __unsafe__value } = ref
+        if (typeof __unsafe__value !== 'function') return
+        $.apply(__unsafe__value, __unsafe__this, [
+            event,
+            $unsafe.expose((...args: any[]) => {
+                $.setPrototypeOf(args, null)
+                sendEvent(bridgeEvent, path, event, args)
+            }),
+        ])
+    } catch {}
 }
 
-function untilInner(name: string) {
-    if (has(window, name)) return apply<(result: true) => Promise<true>>(resolve, Promise, [true])
+function __unsafe__untilInner(name: string) {
+    if ($.hasOwn(__unsafe__window, name)) return $.PromiseResolve(true)
 
-    let restCheckTimes = 150 // 30s
+    let restCheckTimes = 15 // 3s
 
-    return new Promise<true>((resolve) => {
+    return new $.Promise<true>((resolve, reject) => {
         function check() {
             restCheckTimes -= 1
-            if (restCheckTimes < 0) return
-            if (has(window, name)) return resolve(true)
-            apply(setTimeout, window, [check, 200])
+            if (restCheckTimes < 0) return reject(new Error('timeout'))
+            if ($.hasOwn(__unsafe__window, name)) return resolve(true)
+            $.setTimeout(check, 200)
         }
         check()
     })
 }
 
-export function until(path: string, id: number) {
-    handlePromise(id, () => untilInner(path))
+export function __unsafe__until(path: string, id: number) {
+    handlePromise(id, () => __unsafe__untilInner(path))
 }

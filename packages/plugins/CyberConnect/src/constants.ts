@@ -1,3 +1,8 @@
-import { PluginId } from '@masknet/plugin-infra'
-export const CYBERCONNECT_PLUGIN_NAME = 'CyberConnect'
-export const CYBERCONNECT_PLUGIN_ID = PluginId.CyberConnect
+import { PluginID } from '@masknet/shared-base'
+export const CYBERCONNECT_PLUGIN_ID = PluginID.CyberConnect
+
+export enum ProfileTab {
+    Followings = 'Followings',
+    Followers = 'Followers',
+}
+export const PageSize = 50

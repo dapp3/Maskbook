@@ -1,7 +1,7 @@
 import type { PostIVIdentifier, ProfileIdentifier, ProfileInformation } from '@masknet/shared-base'
-import { queryProfilesDB } from '../../database/persona/db'
-import { queryPostDB } from '../../database/post'
-import { toProfileInformation } from '../__utils__/convert'
+import { queryProfilesDB } from '../../database/persona/db.js'
+import { queryPostDB } from '../../database/post/index.js'
+import { toProfileInformation } from '../__utils__/convert.js'
 
 export async function hasRecipientAvailable(whoAmI: ProfileIdentifier): Promise<boolean> {
     const profiles = await queryProfilesDB({ hasLinkedPersona: true, network: whoAmI.network })
@@ -12,8 +12,8 @@ export async function hasRecipientAvailable(whoAmI: ProfileIdentifier): Promise<
 }
 
 export async function getRecipients(whoAmI: ProfileIdentifier): Promise<ProfileInformation[]> {
-    const profiles = (await queryProfilesDB({ hasLinkedPersona: true, network: whoAmI.network })).filter(
-        (x) => x.identifier !== whoAmI && x.linkedPersona,
+    const profiles = (await queryProfilesDB({ network: whoAmI.network, hasLinkedPersona: true })).filter(
+        (x) => x.identifier !== whoAmI,
     )
     return toProfileInformation(profiles).mustNotAwaitThisWithInATransaction
 }

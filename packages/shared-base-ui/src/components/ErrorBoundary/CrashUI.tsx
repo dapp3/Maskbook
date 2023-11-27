@@ -1,10 +1,9 @@
 import { useTimeoutFn } from 'react-use'
-import { useMemo, useState, useContext } from 'react'
+import { useMemo, useState } from 'react'
 import { Box, Button, IconButton, Typography, Alert, AlertTitle, styled } from '@mui/material'
-import ExpandLess from '@mui/icons-material/ExpandLess'
-import ExpandMore from '@mui/icons-material/ExpandMore'
-import { ErrorBoundaryBuildInfoContext, ErrorBoundaryError } from './context'
-import { useSharedBaseI18N } from '../../locales'
+import { ExpandLess, ExpandMore } from '@mui/icons-material'
+import { useBuildInfoMarkdown, type ErrorBoundaryError } from './context.js'
+import { useSharedBaseTrans } from '../../locales/index.js'
 
 export interface CrashUIProps extends React.PropsWithChildren<ErrorBoundaryError> {
     /** Type of the Error */
@@ -18,8 +17,8 @@ export interface CrashUIProps extends React.PropsWithChildren<ErrorBoundaryError
     onRetry: () => void
 }
 export function CrashUI({ onRetry, subject, ...error }: CrashUIProps) {
-    const context = useContext(ErrorBoundaryBuildInfoContext)
-    const t = useSharedBaseI18N()
+    const context = useBuildInfoMarkdown()
+    const t = useSharedBaseTrans()
 
     const [showStack, setShowStack] = useState(false)
 
@@ -68,16 +67,18 @@ Error stack:
                     </Button>
                     <Box sx={{ flex: 1 }} />
                     <IconButton color="inherit" size="small" onClick={() => setShowStack((x) => !x)}>
-                        {showStack ? <ExpandMore /> : <ExpandLess />}
+                        {showStack ?
+                            <ExpandMore />
+                        :   <ExpandLess />}
                     </IconButton>
                 </ActionArea>
-                {showStack ? (
+                {showStack ?
                     <ErrorStack>
                         <Typography component="pre">
                             <code>{error.stack}</code>
                         </Typography>
                     </ErrorStack>
-                ) : null}
+                :   null}
             </Alert>
         </Root>
     )
@@ -98,7 +99,6 @@ const ErrorTitle = styled('div')`
 const ErrorStack = styled('div')`
     user-select: text;
     overflow-x: auto;
-    contain: strict;
     height: 300px;
 `
 

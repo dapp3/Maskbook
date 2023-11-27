@@ -5,80 +5,37 @@
 
 import { AsyncCall, AsyncGeneratorCall } from 'async-call-rpc/full'
 import { assertEnvironment, Environment, MessageTarget, WebExtensionMessage } from '@dimensiondev/holoflows-kit'
-import { getLocalImplementation, serializer } from '@masknet/shared-base'
-import type { GeneratorServices, Services } from './types'
+import { getOrUpdateLocalImplementationHMR, serializer, setDebugObject } from '@masknet/shared-base'
+import type { GeneratorServices, Services } from './types.js'
+
+import { decryptWithDecoding } from './crypto/decryption.js'
 assertEnvironment(Environment.ManifestBackground)
 
-const debugMode = process.env.NODE_ENV === 'development' || process.env.engine === 'safari'
-const message = new WebExtensionMessage<Record<string, any>>({ domain: 'services' })
+const debugMode = process.env.NODE_ENV === 'development'
+const message = new WebExtensionMessage<Record<string, any>>({ domain: '$' })
 const hmr = new EventTarget()
 
-// #region Setup services
-setup('Crypto', () => import(/* webpackPreload: true */ './crypto'))
-setup('Identity', () => import(/* webpackPreload: true */ './identity'))
-setup('Backup', () => import(/* webpackPreload: true */ './backup'))
-setup('Helper', () => import(/* webpackPreload: true */ './helper'))
-setup('SocialNetwork', () => import(/* webpackPreload: true */ './site-adaptors'))
-setup('Settings', () => import(/* webpackPreload: true */ './settings'))
-setup('ThirdPartyPlugin', () => Promise.resolve({}))
+const DebugService = Object.create(null)
+export function startServices() {
+    setup('Crypto', () => import(/* webpackMode: 'eager' */ './crypto/index.js'))
+    setup('Identity', () => import(/* webpackMode: 'eager' */ './identity/index.js'))
+    setup('Backup', () => import(/* webpackMode: 'eager' */ './backup/index.js'))
+    setup('Helper', () => import(/* webpackMode: 'eager' */ './helper/index.js'))
+    setup('SiteAdaptor', () => import(/* webpackMode: 'eager' */ './site-adaptors/index.js'))
+    setup('Settings', () => import(/* webpackMode: 'eager' */ './settings/index.js'), false)
+    setup('Wallet', () => import(/* webpackMode: 'eager' */ './wallet/services/index.js'))
+    setDebugObject('Service', DebugService)
 
-if (import.meta.webpackHot) {
-    import.meta.webpackHot.accept(['./crypto'], () => hmr.dispatchEvent(new Event('crypto')))
-    import.meta.webpackHot.accept(['./identity'], () => hmr.dispatchEvent(new Event('identity')))
-    import.meta.webpackHot.accept(['./backup'], () => hmr.dispatchEvent(new Event('backup')))
-    import.meta.webpackHot.accept(['./helper'], () => hmr.dispatchEvent(new Event('helper')))
-    import.meta.webpackHot.accept(['./settings'], () => hmr.dispatchEvent(new Event('settings')))
-}
-
-function setup<K extends keyof Services>(key: K, implementation: () => Promise<Services[K]>) {
-    const channel = message.events[key].bind(MessageTarget.Broadcast)
-
-    async function load() {
-        const val = await getLocalImplementation(true, `Services.${key}`, implementation, channel)
-        if (debugMode) {
-            Reflect.defineProperty(globalThis, key + 'Service', { configurable: true, value: val })
-        }
-        return val
-    }
-    if (import.meta.webpackHot) hmr.addEventListener(key, load)
-
-    // setup server
-    AsyncCall(load(), {
-        key,
-        serializer,
-        channel,
-        log: {
-            beCalled: true,
-            remoteError: false,
-            type: 'pretty',
-            requestReplay: debugMode,
-        },
-        preferLocalImplementation: true,
-        strict: {
-            // temporally
-            methodNotFound: false,
-            unknownMessage: true,
-        },
-        thenable: false,
-    })
-}
-// #endregion
-
-// #region Setup GeneratorServices
-import { decryptionWithSocialNetworkDecoding } from './crypto/decryption'
-{
     const GeneratorService: GeneratorServices = {
-        decryption: decryptionWithSocialNetworkDecoding,
+        decrypt: decryptWithDecoding,
     }
-    import.meta.webpackHot &&
-        import.meta.webpackHot.accept(['./crypto/decryption'], async () => {
-            GeneratorService.decryption = (await import('./crypto/decryption')).decryptionWithSocialNetworkDecoding
-        })
-    const channel = message.events.GeneratorService.bind(MessageTarget.Broadcast)
-
-    if (debugMode) {
-        Reflect.defineProperty(globalThis, 'GeneratorService', { configurable: true, value: GeneratorService })
-    }
+    import.meta.webpackHot?.accept(['./crypto/decryption'], async () => {
+        GeneratorService.decrypt = (
+            await import(/* webpackMode: 'eager' */ './crypto/decryption.js')
+        ).decryptWithDecoding
+    })
+    const channel = message.events.GeneratorServices.bind(MessageTarget.Broadcast)
+    setDebugObject('GeneratorService', GeneratorService)
 
     AsyncGeneratorCall(GeneratorService, {
         key: 'GeneratorService',
@@ -91,8 +48,44 @@ import { decryptionWithSocialNetworkDecoding } from './crypto/decryption'
             requestReplay: false,
         },
         preferLocalImplementation: true,
-        strict: true,
         thenable: false,
     })
 }
-// #endregion
+
+if (import.meta.webpackHot) {
+    import.meta.webpackHot.accept(['./crypto'], () => hmr.dispatchEvent(new Event('crypto')))
+    import.meta.webpackHot.accept(['./identity'], () => hmr.dispatchEvent(new Event('identity')))
+    import.meta.webpackHot.accept(['./backup'], () => hmr.dispatchEvent(new Event('backup')))
+    import.meta.webpackHot.accept(['./helper'], () => hmr.dispatchEvent(new Event('helper')))
+    import.meta.webpackHot.accept(['./settings'], () => hmr.dispatchEvent(new Event('settings')))
+    import.meta.webpackHot.accept(['./site-adaptors'], () => hmr.dispatchEvent(new Event('site-adaptors')))
+    import.meta.webpackHot.accept(['./wallet/services/'], () => hmr.dispatchEvent(new Event('wallet')))
+}
+
+function setup<K extends keyof Services>(key: K, implementation: () => Promise<Services[K]>, hasLog = true) {
+    const channel = message.events[key].bind(MessageTarget.Broadcast)
+
+    async function load() {
+        const val = await getOrUpdateLocalImplementationHMR(implementation, channel)
+        DebugService[key] = val
+        return val
+    }
+    if (import.meta.webpackHot) hmr.addEventListener(key, load)
+
+    // setup server
+    AsyncCall(load(), {
+        key,
+        serializer,
+        channel,
+        log:
+            hasLog ?
+                {
+                    beCalled: true,
+                    remoteError: false,
+                    type: 'pretty',
+                    requestReplay: debugMode,
+                }
+            :   false,
+        thenable: false,
+    })
+}

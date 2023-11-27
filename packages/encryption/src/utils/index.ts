@@ -1,8 +1,8 @@
-import { CheckedError } from '@masknet/shared-base'
-import { Result } from 'ts-results'
-import { decodeArrayBuffer, decodeText } from '@dimensiondev/kit'
+import { CheckedError } from '@masknet/base'
+import { Result } from 'ts-results-es'
+import { decodeArrayBuffer, decodeText } from '@masknet/kit'
 import { decode as decodeMessagePack, encode } from '@msgpack/msgpack'
-export * from './crypto'
+export * from './crypto.js'
 
 const firstArgString = (e: unknown) => typeof e === 'string'
 const firstArgUint8Array = (e: unknown) => e instanceof Uint8Array

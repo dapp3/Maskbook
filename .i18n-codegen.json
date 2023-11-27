@@ -8,20 +8,24 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useMaskI18N",
+                "hooks": "useMaskSharedTrans",
                 "namespace": "mask",
-                "trans": "MaskTrans"
+                "trans": "MaskSharedTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/social-network-adaptor/twitter.com/locales/en-US.json",
-            "output": "./packages/mask/src/social-network-adaptor/twitter.com/locales/i18n_generated",
+            "input": "./packages/mask/content-script/site-adaptors/twitter.com/locales/en-US.json",
+            "output": "./packages/mask/content-script/site-adaptors/twitter.com/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
                 "hooks": "useDO_NOT_USE",
                 "namespace": "DO_NOT_USE",
-                "trans": "DO_NOT_USE_TRANSLATOR"
+                "trans": "DO_NOT_USE_TRANSLATOR",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -30,9 +34,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useSharedI18N",
+                "hooks": "useSharedTrans",
                 "namespace": "shared",
-                "trans": "SharedTrans"
+                "trans": "SharedTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -41,31 +47,24 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useSharedBaseI18N",
+                "hooks": "useSharedBaseTrans",
                 "namespace": "shareBase",
-                "trans": "SharedBaseTrans"
+                "trans": "SharedBaseTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/dashboard/src/locales/en-US.json",
-            "output": "./packages/dashboard/src/locales/i18n_generated",
+            "input": "./packages/mask/dashboard/locales/en-US.json",
+            "output": "./packages/mask/dashboard/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useDashboardI18N",
+                "hooks": "useDashboardTrans",
                 "namespace": "dashboard",
-                "trans": "DashboardTrans"
-            }
-        },
-        {
-            "input": "./packages/plugins/example/src/locales/en-US.json",
-            "output": "./packages/plugins/example/src/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "io.mask.example",
-                "trans": "Translate"
+                "trans": "DashboardTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -74,31 +73,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useDebuggerTrans",
                 "namespace": "io.mask.debugger",
-                "trans": "Translate"
-            }
-        },
-        {
-            "input": "./packages/plugins/Wallet/src/locales/en-US.json",
-            "output": "./packages/plugins/Wallet/src/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "com.maskbook.wallet",
-                "trans": "Translate"
-            }
-        },
-        {
-            "input": "./packages/plugins/Flow/src/locales/en-US.json",
-            "output": "./packages/plugins/Flow/src/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "com.mask.flow",
-                "trans": "Translate"
+                "trans": "DebuggerTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -107,9 +86,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useFileServiceTrans",
                 "namespace": "com.maskbook.fileservice",
-                "trans": "Translate"
+                "trans": "FileServiceTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -118,10 +99,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useScamSnifferTrans",
                 "namespace": "io.scamsniffer.mask-plugin",
-                "trans": "Translate",
-                "sourceMap": "inline"
+                "trans": "ScamSnifferTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -130,9 +112,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "com.maskbook.cyberconnect",
-                "trans": "Translate"
+                "hooks": "useCyberConnectTrans",
+                "namespace": "me.cyberconnect.app",
+                "trans": "CyberConnectTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -141,53 +125,24 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useRSS3Trans",
                 "namespace": "bio.rss3",
-                "trans": "Translate"
+                "trans": "RSS3Trans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/plugins/DAO/src/locales/en-US.json",
-            "output": "./packages/plugins/DAO/src/locales/i18n_generated",
+            "input": "./packages/plugins/NextID/src/locales/en-US.json",
+            "output": "./packages/plugins/NextID/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "money.juicebox",
-                "trans": "Translate"
-            }
-        },
-        {
-            "input": "./packages/plugins/EVM/src/locales/en-US.json",
-            "output": "./packages/plugins/EVM/src/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "com.mask.evm",
-                "trans": "Translate"
-            }
-        },
-        {
-            "input": "./packages/plugins/Solana/src/locales/en-US.json",
-            "output": "./packages/plugins/Solana/src/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "com.maskbook.solana",
-                "trans": "Translate"
-            }
-        },
-        {
-            "input": "./packages/mask/src/plugins/NextID/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/NextID/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useNextID_Trans",
                 "namespace": "com.mask.next_id",
-                "trans": "Translate"
+                "trans": "NextID_Trans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -196,9 +151,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useTemplateTrans",
                 "namespace": "__template__",
-                "trans": "Translate"
+                "trans": "TemplateTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -207,9 +164,11 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useGoPlusLabsTrans",
                 "namespace": "io.gopluslabs.security",
-                "trans": "Translate"
+                "trans": "GoPlusLabsTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
@@ -218,98 +177,302 @@
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useCrossChainBridgeTrans",
                 "namespace": "io.mask.cross-chain-bridge",
-                "trans": "Translate"
+                "trans": "CrossChainBridgeTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/plugins/RedPacket/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/RedPacket/locales/i18n_generated",
+            "input": "./packages/plugins/RedPacket/src/locales/en-US.json",
+            "output": "./packages/plugins/RedPacket/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useRedPacketTrans",
                 "namespace": "com.maskbook.red_packet",
-                "trans": "Translate"
+                "trans": "RedPacketTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/plugins/Tips/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/Tips/locales/i18n_generated",
+            "input": "./packages/plugins/Tips/src/locales/en-US.json",
+            "output": "./packages/plugins/Tips/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useTipsTrans",
                 "namespace": "com.maskbook.tip",
-                "trans": "Translate"
+                "trans": "TipsTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/plugins/Avatar/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/Avatar/locales/i18n_generated",
+            "input": "./packages/plugins/Avatar/src/locales/en-US.json",
+            "output": "./packages/plugins/Avatar/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useAvatarTrans",
                 "namespace": "com.maskbook.avatar",
-                "trans": "Translate"
+                "trans": "AvatarTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/plugins/Trader/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/Trader/locales/i18n_generated",
+            "input": "./packages/plugins/Trader/src/locales/en-US.json",
+            "output": "./packages/plugins/Trader/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useTraderTrans",
                 "namespace": "com.maskbook.trader",
-                "trans": "Translate"
+                "trans": "TraderTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/plugins/Gitcoin/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/Gitcoin/locales/i18n_generated",
+            "input": "./packages/plugins/Gitcoin/src/locales/en-US.json",
+            "output": "./packages/plugins/Gitcoin/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useGitcoinTrans",
                 "namespace": "co.gitcoin",
-                "trans": "Translate"
+                "trans": "GitcoinTrans",
+                "emitTS": true,
+                "shouldUnescape": true
             }
         },
         {
-            "input": "./packages/mask/src/plugins/Referral/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/Referral/locales/i18n_generated",
+            "input": "./packages/plugins/MaskBox/src/locales/en-US.json",
+            "output": "./packages/plugins/MaskBox/src/locales/i18n_generated",
             "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
             "generator": {
                 "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "com.maskbook.referral",
-                "trans": "Translate",
-                "sourceMap": "inline"
-            }
-        },
-        {
-            "input": "./packages/mask/src/plugins/FindTruman/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/FindTruman/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
-                "namespace": "org.findtruman",
-                "trans": "Translate"
-            }
-        },
-        {
-            "input": "./packages/mask/src/plugins/MaskBox/locales/en-US.json",
-            "output": "./packages/mask/src/plugins/MaskBox/locales/i18n_generated",
-            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
-            "generator": {
-                "type": "i18next/react-hooks",
-                "hooks": "useI18N",
+                "hooks": "useMaskBoxTrans",
                 "namespace": "com.maskbook.box",
-                "trans": "Translate"
+                "trans": "MaskBoxTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Pets/src/locales/en-US.json",
+            "output": "./packages/plugins/Pets/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "usePetsTrans",
+                "namespace": "com.maskbook.pets",
+                "trans": "PetsTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Web3Profile/src/locales/en-US.json",
+            "output": "./packages/plugins/Web3Profile/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useWeb3ProfileTrans",
+                "namespace": "io.mask.web3-profile",
+                "trans": "Web3ProfileTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Handle/src/locales/en-US.json",
+            "output": "./packages/plugins/Handle/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useHandleTrans",
+                "namespace": "com.maskbook.handle",
+                "trans": "HandleTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Approval/src/locales/en-US.json",
+            "output": "./packages/plugins/Approval/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useApprovalTrans",
+                "namespace": "com.maskbook.approval",
+                "trans": "ApprovalTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/ScamWarning/src/locales/en-US.json",
+            "output": "./packages/plugins/ScamWarning/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useScamWarningTrans",
+                "namespace": "com.mask.scam-warning",
+                "trans": "ScamWarningTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/SmartPay/src/locales/en-US.json",
+            "output": "./packages/plugins/SmartPay/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useSmartPayTrans",
+                "namespace": "com.mask.smart-pay",
+                "trans": "SmartPayTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/VCent/src/locales/en-US.json",
+            "output": "./packages/plugins/VCent/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useVCentTrans",
+                "namespace": "com.maskbook.tweet",
+                "trans": "VCentTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Transak/src/locales/en-US.json",
+            "output": "./packages/plugins/Transak/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useTransakTrans",
+                "namespace": "com.maskbook.transak",
+                "trans": "TransakTrans",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Collectible/src/locales/en-US.json",
+            "output": "./packages/plugins/Collectible/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useCollectibleTrans",
+                "namespace": "com.maskbook.collectibles",
+                "trans": "Collectible",
+                "emitTS": true,
+                "shouldUnescape": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Claim/src/locales/en-US.json",
+            "output": "./packages/plugins/Claim/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useClaimTrans",
+                "namespace": "com.mask.claim",
+                "trans": "ClaimTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/ArtBlocks/src/locales/en-US.json",
+            "output": "./packages/plugins/ArtBlocks/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useArtBlocksTrans",
+                "namespace": "io.artblocks",
+                "trans": "ArtBlocksTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Savings/src/locales/en-US.json",
+            "output": "./packages/plugins/Savings/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useSavingsTrans",
+                "namespace": "com.savings",
+                "trans": "SavingsTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Snapshot/src/locales/en-US.json",
+            "output": "./packages/plugins/Snapshot/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useSnapshotTrans",
+                "namespace": "org.snapshot",
+                "trans": "SnapshotTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/ProfileCard/src/locales/en-US.json",
+            "output": "./packages/plugins/ProfileCard/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useProfileCardTrans",
+                "namespace": "io.mask.web3-profile-card",
+                "trans": "ProfileCardTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/SwitchLogo/src/locales/en-US.json",
+            "output": "./packages/plugins/SwitchLogo/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useSwitchLogoTrans",
+                "namespace": "io.mask.switch-logo",
+                "trans": "SwitchLogoTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/Calendar/src/locales/en-US.json",
+            "output": "./packages/plugins/Calendar/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useCalendarTrans",
+                "namespace": "io.mask.calendar",
+                "trans": "CalendarTrans",
+                "emitTS": true
+            }
+        },
+        {
+            "input": "./packages/plugins/FriendTech/src/locales/en-US.json",
+            "output": "./packages/plugins/FriendTech/src/locales/i18n_generated",
+            "parser": { "type": "i18next", "contextSeparator": "$", "pluralSeparator": "_" },
+            "generator": {
+                "type": "i18next/react-hooks",
+                "hooks": "useI18N",
+                "namespace": "io.mask.friend-tech",
+                "trans": "Translate",
+                "emitTS": true
             }
         }
     ]

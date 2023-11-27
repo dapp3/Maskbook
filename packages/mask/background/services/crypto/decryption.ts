@@ -1,78 +1,96 @@
-import { encodeArrayBuffer } from '@dimensiondev/kit'
+import { encodeArrayBuffer } from '@masknet/kit'
 import {
     decrypt,
     parsePayload,
     DecryptProgressKind,
-    EC_KeyCurveEnum,
-    DecryptProgress,
-    SocialNetworkEnum,
-    SocialNetworkEnumToProfileDomain,
-    EC_Key,
-    socialNetworkDecoder,
+    EC_KeyCurve,
+    type DecryptProgress,
+    type EncryptPayloadNetwork,
+    encryptPayloadNetworkToDomain,
+    type EC_Key,
+    decodeByNetwork,
     steganographyDecodeImage,
     DecryptError,
     DecryptErrorReasons,
-    DecryptReportedInfo,
+    type DecryptReportedInfo,
 } from '@masknet/encryption'
 import {
-    AESCryptoKey,
-    ECKeyIdentifierFromJsonWebKey,
-    EC_JsonWebKey,
-    EC_Public_JsonWebKey,
+    type AESCryptoKey,
+    type EC_JsonWebKey,
+    type EC_Public_JsonWebKey,
     PostIVIdentifier,
-    ProfileIdentifier,
+    type ProfileIdentifier,
+    ECKeyIdentifier,
 } from '@masknet/shared-base'
 import type { TypedMessage } from '@masknet/typed-message'
-import { noop } from 'lodash-unified'
-import { queryProfileDB, queryPersonaDB } from '../../database/persona/db'
+import { noop } from 'lodash-es'
+import { queryProfileDB, queryPersonaDB } from '../../database/persona/db.js'
 import {
     createProfileWithPersona,
     decryptByLocalKey,
     deriveAESByECDH,
     hasLocalKeyOf,
     queryPublicKey,
-} from '../../database/persona/helper'
-import { queryPostDB } from '../../database/post'
-import { savePostKeyToDB } from '../../database/post/helper'
+} from '../../database/persona/helper.js'
+import { queryPostDB } from '../../database/post/index.js'
+import { savePostKeyToDB } from '../../database/post/helper.js'
 import {
     GUN_queryPostKey_version37,
     GUN_queryPostKey_version39Or38,
     GUN_queryPostKey_version40,
-} from '../../network/gun/encryption/queryPostKey'
+} from '../../network/queryPostKey.js'
 
 export interface DecryptionContext {
-    currentSocialNetwork: SocialNetworkEnum
+    encryptPayloadNetwork: EncryptPayloadNetwork
     currentProfile: ProfileIdentifier | null
     authorHint: ProfileIdentifier | null
     postURL: string | undefined
 }
-export type SocialNetworkEncodedPayload =
-    | { type: 'text'; text: string }
-    | { type: 'image'; image: Blob }
-    | { type: 'image-url'; image: string }
-const downloadImage = (url: string): Promise<ArrayBuffer> => fetch(url).then((x) => x.arrayBuffer())
+export type EncodedPayload =
+    | {
+          type: 'text'
+          text: string
+      }
+    | {
+          type: 'image'
+          image: Blob
+      }
+    | {
+          type: 'image-url'
+          image: string
+      }
+async function downloadImage(url: string): Promise<ArrayBuffer> {
+    const x = await fetch(url)
+    return await x.arrayBuffer()
+}
 
 /**
  *
  * @param encoded If the encoded content is a text, it should only contain 1 payload. Extra payload will be ignored.
  * @param context
  */
-export async function* decryptionWithSocialNetworkDecoding(
-    encoded: SocialNetworkEncodedPayload,
+export async function* decryptWithDecoding(
+    encoded: EncodedPayload,
     context: DecryptionContext,
 ): AsyncGenerator<DecryptProgress, void, undefined> {
     let decoded: string | Uint8Array
     if (encoded.type === 'text') {
-        decoded = socialNetworkDecoder(context.currentSocialNetwork, encoded.text)[0]
+        decoded = decodeByNetwork(context.encryptPayloadNetwork, encoded.text)[0]
     } else {
         if (!context.authorHint) {
             return yield new DecryptError(DecryptErrorReasons.UnrecognizedAuthor, undefined)
         }
         const result = await steganographyDecodeImage(encoded.image, {
-            pass: context.authorHint.toText(),
+            password: context.authorHint.toText(),
             downloadImage,
         })
-        decoded = socialNetworkDecoder(context.currentSocialNetwork, result)[0]
+        if (typeof result === 'string') {
+            decoded = decodeByNetwork(context.encryptPayloadNetwork, result)[0]
+        } else if (result === null) {
+            return yield new DecryptError(DecryptErrorReasons.NoPayloadFound, undefined)
+        } else {
+            decoded = result
+        }
     }
 
     if (!decoded) return yield new DecryptError(DecryptErrorReasons.NoPayloadFound, undefined)
@@ -82,30 +100,30 @@ export async function* decryptionWithSocialNetworkDecoding(
 const inMemoryCache = new Map<PostIVIdentifier, TypedMessage>()
 async function* decryption(payload: string | Uint8Array, context: DecryptionContext) {
     const parse = await parsePayload(payload)
-    if (parse.err) return null
+    if (parse.isErr()) return null
 
-    const { currentSocialNetwork, postURL, currentProfile, authorHint } = context
+    const { encryptPayloadNetwork, postURL, currentProfile, authorHint } = context
 
     // #region Identify the PostIdentifier
-    const iv = parse.val.encryption.unwrapOr(null)?.iv.unwrapOr(null)
+    const iv = parse.value.encryption.unwrapOr(null)?.iv.unwrapOr(null)
     {
         if (!iv) return null
         // iv is required to identify the post and it also used in comment encryption.
         const info: DecryptReportedInfo = {
             type: DecryptProgressKind.Info,
             iv,
-            version: parse.val.version,
+            version: parse.value.version,
         }
-        if (parse.val.encryption.ok) {
-            const val = parse.val.encryption.val
+        if (parse.value.encryption.isOk()) {
+            const val = parse.value.encryption.value
             info.publicShared = val.type === 'public'
-            if (val.type === 'E2E') info.isAuthorOfPost = val.ownersAESKeyEncrypted.ok
+            if (val.type === 'E2E') info.isAuthorOfPost = val.ownersAESKeyEncrypted.isOk()
         }
         yield info
     }
     const id = new PostIVIdentifier(
-        SocialNetworkEnumToProfileDomain(currentSocialNetwork),
-        encodeArrayBuffer(new Uint8Array(iv.buffer)),
+        encryptPayloadNetworkToDomain(encryptPayloadNetwork),
+        encodeArrayBuffer(new Uint8Array(iv)),
     )
     // #endregion
 
@@ -126,7 +144,7 @@ async function* decryption(payload: string | Uint8Array, context: DecryptionCont
 
     const progress = decrypt(
         {
-            message: parse.val,
+            message: parse.value,
             onDecrypted(message) {
                 inMemoryCache.set(id, message)
             },
@@ -148,6 +166,8 @@ async function* decryption(payload: string | Uint8Array, context: DecryptionCont
                 return Array.from((await deriveAESByECDH(pub)).values())
             },
             queryAuthorPublicKey(author, signal) {
+                // TODO: This should try to fetch publicKey from NextID
+                // but it is not urgent because all new posts has their publicKey embedded
                 return queryPublicKey(author || authorHint)
             },
             async *queryPostKey_version37(iv, signal) {
@@ -157,7 +177,7 @@ async function* decryption(payload: string | Uint8Array, context: DecryptionCont
                 yield* GUN_queryPostKey_version37(
                     iv,
                     author,
-                    context.currentSocialNetwork,
+                    context.encryptPayloadNetwork,
                     signal || new AbortController().signal,
                 )
             },
@@ -169,7 +189,7 @@ async function* decryption(payload: string | Uint8Array, context: DecryptionCont
                     -38,
                     iv,
                     author,
-                    context.currentSocialNetwork,
+                    context.encryptPayloadNetwork,
                     signal || new AbortController().signal,
                 )
             },
@@ -181,7 +201,7 @@ async function* decryption(payload: string | Uint8Array, context: DecryptionCont
                     -39,
                     iv,
                     author,
-                    context.currentSocialNetwork,
+                    context.encryptPayloadNetwork,
                     signal || new AbortController().signal,
                 )
             },
@@ -217,7 +237,7 @@ async function storeAuthorPublicKey(
         // ! Skip store the public key because it might be a security problem.
         return
     }
-    if (pub.algr !== EC_KeyCurveEnum.secp256k1) {
+    if (pub.algr !== EC_KeyCurve.secp256k1) {
         throw new Error('TODO: support other curves')
     }
 
@@ -227,7 +247,7 @@ async function storeAuthorPublicKey(
     if (persona?.privateKey) return
 
     const key = (await crypto.subtle.exportKey('jwk', pub.key)) as EC_JsonWebKey
-    const otherPersona = await queryPersonaDB(await ECKeyIdentifierFromJsonWebKey(key))
+    const otherPersona = await queryPersonaDB((await ECKeyIdentifier.fromJsonWebKey(key)).unwrap())
     if (otherPersona?.privateKey) return
 
     return createProfileWithPersona(

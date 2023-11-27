@@ -1,5 +1,4 @@
-import type { LoadingButtonProps } from '@mui/lab/LoadingButton'
-import LoadingButton from '@mui/lab/LoadingButton'
+import { LoadingButton, type LoadingButtonProps } from '@mui/lab'
 import { memo, useCallback, useState, forwardRef } from 'react'
 import { CircularProgress } from '@mui/material'
 
@@ -8,6 +7,9 @@ interface MaskLoadingButtonProps extends Exclude<LoadingButtonProps, 'loading' |
     soloLoading?: boolean
 }
 
+/**
+ * @deprecated Please use <ActionButton />
+ * */
 export const MaskLoadingButton = memo(
     forwardRef<HTMLButtonElement, MaskLoadingButtonProps>((props, ref) => {
         const { onClick, children, soloLoading, variant, ...rest } = props
@@ -33,7 +35,12 @@ export const MaskLoadingButton = memo(
 
         return (
             <LoadingButton
-                loadingPosition={rest.startIcon ? 'start' : rest.endIcon ? 'end' : undefined}
+                loadingPosition={
+                    rest.startIcon ? 'start'
+                    : rest.endIcon ?
+                        'end'
+                    :   undefined
+                }
                 loading={loading}
                 loadingIndicator={isSoloLoading ? <CircularProgress color="primary" size={16} /> : undefined}
                 {...rest}

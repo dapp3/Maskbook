@@ -1,9 +1,7 @@
-import { memo, PropsWithChildren, useCallback } from 'react'
+import { memo, type PropsWithChildren, useCallback } from 'react'
 import { Typography, Link as MaterialLink } from '@mui/material'
-import type { RenderFragmentsContextType } from '@masknet/typed-message/dom'
-import { useActivatedPluginsSNSAdaptor } from '@masknet/plugin-infra/content-script'
-import { useChainId } from '@masknet/plugin-infra/web3'
-import { NetworkPluginID } from '@masknet/web3-shared-base'
+import type { RenderFragmentsContextType } from '@masknet/typed-message-react'
+import { useActivatedPluginsSiteAdaptor } from '@masknet/plugin-infra/content-script'
 
 export const Container = memo(function Container(props: PropsWithChildren<{}>) {
     return (
@@ -14,16 +12,17 @@ export const Container = memo(function Container(props: PropsWithChildren<{}>) {
 })
 
 export const Link = memo(function Anchor(props: RenderFragmentsContextType.LinkProps) {
-    let text = props.children
-    if (text.startsWith('https://mask.io')) {
-        text = 'Mask.io'
-    }
-    return <MaterialLink href={props.href} children={text} />
+    const text = props.children.startsWith('https://mask.io') ? 'Mask.io' : props.children
+    return (
+        <MaterialLink href={props.href} fontSize="inherit">
+            {text}
+            {props.suggestedPostImage}
+        </MaterialLink>
+    )
 })
 
 export function useTagEnhancer(kind: 'hash' | 'cash', content: string) {
-    const chainId = useChainId(NetworkPluginID.PLUGIN_EVM)
-    const plugin = useActivatedPluginsSNSAdaptor(false)
+    const plugin = useActivatedPluginsSiteAdaptor('any')
         .filter((x) => x.enhanceTag)
         .at(0)
 
@@ -35,7 +34,7 @@ export function useTagEnhancer(kind: 'hash' | 'cash', content: string) {
     )
     const onMouseEnter: React.EventHandler<React.MouseEvent<HTMLAnchorElement>> = useCallback(
         (event) => {
-            const cancel = plugin?.enhanceTag?.onHover?.(kind, content, event, chainId)
+            const cancel = plugin?.enhanceTag?.onHover?.(kind, content, event)
             event.currentTarget.addEventListener('mouseleave', () => cancel?.(), { once: true })
         },
         [plugin],

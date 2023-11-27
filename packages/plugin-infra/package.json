@@ -1,53 +1,44 @@
 {
   "name": "@masknet/plugin-infra",
   "private": true,
+  "sideEffects": false,
   "license": "AGPL-3.0-or-later",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/entry.d.ts",
-      "webpack": "./src/entry.ts",
+      "mask-src": "./src/entry.ts",
       "default": "./dist/entry.js"
-    },
-    "./web3": {
-      "types": "./dist/entry-web3.d.ts",
-      "webpack": "./src/entry-web3.ts",
-      "default": "./dist/entry-web3.js"
-    },
-    "./web3-evm": {
-      "types": "./dist/entry-web3-evm.d.ts",
-      "webpack": "./src/entry-web3-evm.ts",
-      "default": "./dist/entry-web3-evm.js"
     },
     "./dom": {
       "types": "./dist/entry-dom.d.ts",
-      "webpack": "./src/entry-dom.ts",
+      "mask-src": "./src/entry-dom.ts",
       "default": "./dist/entry-dom.js"
+    },
+    "./dom/context": {
+      "types": "./dist/dom/context.d.ts",
+      "mask-src": "./src/dom/context.ts",
+      "default": "./dist/dom/context.js"
     },
     "./background-worker": {
       "types": "./dist/entry-background-worker.d.ts",
-      "webpack": "./src/entry-background-worker.ts",
+      "mask-src": "./src/entry-background-worker.ts",
       "default": "./dist/entry-background-worker.js"
-    },
-    "./dashboard": {
-      "types": "./dist/entry-dashboard.d.ts",
-      "webpack": "./src/entry-dashboard.ts",
-      "default": "./dist/entry-dashboard.js"
     },
     "./content-script": {
       "types": "./dist/entry-content-script.d.ts",
-      "webpack": "./src/entry-content-script.ts",
+      "mask-src": "./src/entry-content-script.ts",
       "default": "./dist/entry-content-script.js"
+    },
+    "./content-script/context": {
+      "types": "./dist/site-adaptor/context.d.ts",
+      "mask-src": "./src/site-adaptor/context.ts",
+      "default": "./dist/site-adaptor/context.js"
     }
   },
   "types": "./dist/entry.d.ts",
   "typesVersions": {
     "*": {
-      "web3": [
-        "./dist/entry-web3.d.ts"
-      ],
-      "web3-evm": [
-        "./dist/entry-web3-evm.d.ts"
-      ],
       "dom": [
         "./dist/entry-dom.d.ts"
       ],
@@ -63,40 +54,19 @@
     }
   },
   "dependencies": {
-    "@dimensiondev/holoflows-kit": "^0.9.0-20220520093249-0870919",
-    "@dimensiondev/mask-wallet-core": "0.1.0-20211013082857-eb62e5f",
-    "@masknet/encryption": "workspace:*",
-    "@masknet/shared-base": "workspace:*",
-    "@masknet/shared-base-ui": "workspace:*",
-    "@masknet/theme": "workspace:*",
-    "@masknet/typed-message": "workspace:*",
-    "@masknet/web3-constants": "workspace:*",
-    "@masknet/web3-contracts": "workspace:*",
-    "@masknet/web3-shared-base": "workspace:*",
-    "@masknet/web3-shared-evm": "workspace:*",
-    "@masknet/web3-shared-flow": "workspace:*",
-    "@masknet/web3-shared-solana": "workspace:*",
+    "@masknet/encryption": "workspace:^",
+    "@masknet/flags": "workspace:^",
+    "@masknet/public-api": "workspace:^",
+    "@masknet/shared-base": "workspace:^",
+    "@masknet/shared-base-ui": "workspace:^",
+    "@masknet/theme": "workspace:^",
+    "@masknet/typed-message": "workspace:^",
+    "@masknet/web3-helpers": "workspace:^",
+    "@masknet/web3-shared-base": "workspace:^",
     "@servie/events": "^3.0.0",
-    "@types/ethereum-blockies": "^0.1.0",
     "@types/use-subscription": "^1.0.0",
-    "async-call-rpc": "^6.1.0",
-    "bignumber.js": "^9.0.2",
-    "ethereum-blockies": "^0.1.1",
-    "lru-cache": "^7.10.1",
+    "async-call-rpc": "^6.3.1",
     "react-use": "^17.4.0",
-    "unstated-next": "^1.1.0",
-    "urlcat": "^2.0.4",
-    "use-subscription": "1.6.0",
-    "wallet.ts": "^1.0.1",
-    "web3": "1.7.4",
-    "web3-core": "1.7.4",
-    "web3-core-helpers": "1.7.4",
-    "web3-utils": "1.7.4"
-  },
-  "devDependencies": {
-    "@types/lru-cache": "^7.10.10"
-  },
-  "peerDependencies": {
-    "react-i18next": "^11.15.3"
+    "use-subscription": "^1.8.0"
   }
 }

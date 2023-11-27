@@ -1,4 +1,4 @@
-import { LinkOutIcon } from '@masknet/icons'
+import { Icons } from '@masknet/icons'
 import { Link, Stack, Typography } from '@mui/material'
 import { memo } from 'react'
 
@@ -16,16 +16,16 @@ export const ProvidedBy = memo<ProvidedByProps>(({ providerLink, providerName })
             <Typography fontSize={14} fontWeight={500}>
                 {providerName}
             </Typography>
-            {providerLink && (
+            {providerLink ?
                 <Link
                     href={providerLink}
                     underline="none"
                     target="_blank"
                     rel="noopener"
                     sx={{ display: 'inline-flex' }}>
-                    <LinkOutIcon style={{ width: 16, height: 16, color: '#6E767D' }} />
+                    <Icons.LinkOut size={16} color="#6E767D" />
                 </Link>
-            )}
+            :   null}
         </Stack>
     )
 })

@@ -1,7 +1,12 @@
 import type { PersonaInformation, ProfileInformation } from '@masknet/shared-base'
-import { noop } from 'lodash-unified'
-import { queryAvatarsDataURL } from '../../database/avatar-cache/avatar'
-import { FullPersonaDBTransaction, PersonaRecord, ProfileRecord, queryProfilesDB } from '../../database/persona/db'
+import { noop } from 'lodash-es'
+import { queryAvatarsDataURL } from '../../database/avatar-cache/avatar.js'
+import {
+    type FullPersonaDBTransaction,
+    type PersonaRecord,
+    type ProfileRecord,
+    queryProfilesDB,
+} from '../../database/persona/db.js'
 
 /** @internal */
 export function toProfileInformation(profiles: ProfileRecord[]) {
@@ -13,6 +18,7 @@ export function toProfileInformation(profiles: ProfileRecord[]) {
                     identifier: profile.identifier,
                     nickname: profile.nickname,
                     linkedPersona: profile.linkedPersona,
+                    createAt: profile.createdAt,
                 })
             }
 
@@ -32,6 +38,7 @@ export function toPersonaInformation(personas: PersonaRecord[], t: FullPersonaDB
         personaInfo.push({
             nickname: persona.nickname,
             identifier: persona.identifier,
+            address: persona.address,
             linkedProfiles: map,
         })
 

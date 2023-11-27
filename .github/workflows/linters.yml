@@ -2,86 +2,160 @@ name: Linters and tests
 
 on:
   push:
-    branches: [master, develop*, released]
+    branches: [master, develop, released, hotfix/*, release/*]
   pull_request:
-    branches: [master, develop*, released]
+    branches: [master, develop, released, hotfix/*, release/*]
+  merge_group:
+    types: [checks_requested]
 
-# Cancels all previous workflow runs for pull requests that have not completed.
+permissions:
+  contents: read
+  packages: read
+
 concurrency:
-  # The concurrency group contains the workflow name and the branch name for
-  # pull requests or the commit hash for any other events.
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
+  codegen:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - name: Authenticate NPM
+        uses: DimensionDev/github-token-action@latest
+        with:
+            registry: true
+      - run: git config --global url."https://github.com/".insteadOf git@github.com
+      - run: pnpm install
+      - run: npx gulp lint-package-json
+      - run: npx gulp codegen
+      - uses: EndBug/add-and-commit@v9
+        with:
+          message: 'fix: run codegen'
+      - run: npx gulp sync-languages
+      - uses: EndBug/add-and-commit@v9
+        with:
+          message: 'fix: run sync-languages'
+      - run: npx gulp fix-plugins-tsconfig
+      - uses: EndBug/add-and-commit@v9
+        with:
+          message: 'fix: packages/plugins/tsconfig.json'
   prettier:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@v2
-      - run: npx prettier@2.7.1 --check .
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v3
+      - run: npx prettier@3.1.0 --write .
+      - uses: EndBug/add-and-commit@v9
+        with:
+          message: 'fix: prettier'
   markdownlint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@v2
-      - run: npx markdownlint-cli .
-  editorconfig:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v3
+      - run: npx markdownlint-cli --fix .
+      - uses: EndBug/add-and-commit@v9
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: DimensionDev/setup-editorconfig-action@latest
-      - run: editorconfig-checker
+          message: 'fix: markdownlint'
   anti-trojan-source:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
       - run: npx anti-trojan-source --files='packages/**/src/**/*.{ts,tsx,js}'
-  type-check-and-jest:
-    runs-on: ubuntu-20.04
+  type-check:
+    runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - name: Authenticate NPM
+        uses: DimensionDev/github-token-action@latest
+        with:
+            registry: true
+      - run: git config --global url."https://github.com/".insteadOf git@github.com
+      - run: pnpm install
+      - run: npx gulp codegen
+      - run: npx gulp typescript
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - name: Authenticate NPM
+        uses: DimensionDev/github-token-action@latest
+        with:
+            registry: true
+      - run: git config --global url."https://github.com/".insteadOf git@github.com
+      - run: pnpm install
+      - run: npx gulp codegen
+      - run: npx gulp polyfill
+      - run: pnpm run test
+  eslint:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: pnpm/action-setup@v2.2.1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "pnpm"
+      - name: Authenticate NPM
+        uses: DimensionDev/github-token-action@latest
+        with:
+            registry: true
       - name: Get cache date
         id: get-date
         run: echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
         shell: bash
-      - uses: actions/checkout@v2
+      - name: Restore ESLint cache
+        uses: actions/cache@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: pnpm/action-setup@v2.2.1
-      - uses: actions/setup-node@v2
-        with:
-          node-version: "17"
-          cache: "pnpm"
+          path: ./.eslintcache
+          key: linter-${{ steps.get-date.outputs.date }}
+          restore-keys: linter-
+      - run: git config --global url."https://github.com/".insteadOf git@github.com
       - run: pnpm install
       - run: npx gulp codegen
-      - run: npx gulp polyfill
-      - run: node --experimental-vm-modules ./node_modules/jest/bin/jest.js
-  eslint:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: pnpm/action-setup@v2.2.1
-      - uses: actions/setup-node@v2
-        with:
-          node-version: "17"
-          cache: "pnpm"
-      - run: pnpm install
       - name: Run Eslint
         run: |
           # report to stdio and to file, it's cached, the second run should be fast
           pnpm run lint:ci
           pnpm run lint:ci-report
+      - uses: EndBug/add-and-commit@v9
+        with:
+          message: 'fix: markdownlint'
       - name: Upload eslint report
         uses: actions/upload-artifact@v2
         with:

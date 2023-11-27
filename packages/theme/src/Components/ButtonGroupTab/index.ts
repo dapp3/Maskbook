@@ -1,5 +1,2 @@
-export { ButtonTab } from './ButtonGroupTab'
-export type { ButtonTabProps } from './ButtonGroupTab'
-
-export { ButtonGroupTabList } from './ButtonGroupTabList'
-export type { ButtonGroupTabListProps } from './ButtonGroupTabList'
+export { ButtonTab } from './ButtonGroupTab.js'
+export { ButtonGroupTabList, type ButtonGroupTabListProps } from './ButtonGroupTabList.js'

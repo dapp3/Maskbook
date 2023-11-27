@@ -1,50 +1,65 @@
 import yargs from 'yargs'
-import type { ExtensionBuildArgs } from '../extension'
+import type { BuildFlagsExtended } from '../extension/flags.js'
+import { hideBin } from 'yargs/helpers'
+import { applyDotEnv, parseManifest } from '../extension/dotenv.js'
+import { ManifestFile } from '../../../mask/.webpack/flags.js'
 
-const { hideBin } = require('yargs/helpers')
-const presets = ['chromium', 'firefox', 'android', 'iOS', 'base'] as const
-export function extensionArgsParser() {
+const manifestFiles = Object.values(ManifestFile)
+export function extensionArgsParser(mode: 'development' | 'production') {
     const opts = yargs(hideBin(process.argv))
-        .options<'preset', { choices: typeof presets[number][] }>('preset', {
-            // @ts-ignore
-            type: 'string',
-            choices: [...presets],
-            description: 'Select which preset to build',
-        })
+        .options('output', { type: 'string', normalize: true, description: 'Output folder' })
         .conflicts('beta', 'insider')
         .options('beta', { type: 'boolean', description: 'Build beta version' })
         .options('insider', { type: 'boolean', description: 'Build insider version' })
-        .options('reproducible', { type: 'boolean', description: 'Build a reproducible build' })
+
+        .options('manifest', {
+            type: 'string',
+            choices: ['2', '3', ...manifestFiles] as const,
+            description: 'Select which manifest file/version to use',
+        })
+
         .options('profile', { type: 'boolean', description: 'Build a profile build' })
-        .options('mv3', {
-            type: 'boolean',
-            description: 'Build in manifest-v3 mode (Not working!)',
+
+        .options('progress', { type: 'boolean', description: 'Show build progress' })
+        .options('hmr', { type: 'boolean', description: 'Enable Hot Module Reload' })
+        .options('reactRefresh', { type: 'boolean', description: 'Enable react-refresh', implies: 'hmr' })
+        .options('devtools', { type: 'boolean', description: 'Enable devtools' })
+        .options('devtoolsEditorURI', { type: 'string', description: 'Editor URI to be used in React Devtools.' })
+        .options('sourceMap', {
+            type: 'string',
+            description: 'Enable source map',
+            coerce(arg) {
+                if (arg === '') return true
+                if (arg === 'false') return false
+                return arg
+            },
         })
-        .options('readonlyCache', {
+        .options('sourceMapHideFrameworks', {
             type: 'boolean',
-            description: 'Do not write Webpack filesystem cache during the build',
+            description: 'Hide node_modules and webpack internal stack when using sourceMap',
         })
-        .options('progress', {
-            type: 'boolean',
-            description: 'Show build progress',
-        })
+
         .hide('version')
         .strict().argv
-    const extensionOpts: ExtensionBuildArgs = {
-        mv3: opts.mv3,
-        android: opts.preset === 'android',
-        chromium: opts.preset === 'chromium',
-        firefox: opts.preset === 'firefox',
-        iOS: opts.preset === 'iOS',
-        beta: opts.beta,
-        insider: opts.insider,
-        profile: opts.profile,
-        readonlyCache: opts.readonlyCache,
-        reproducible: opts.reproducible,
+
+    if (opts instanceof Promise) throw new TypeError()
+    const extensionOpts: BuildFlagsExtended = {
+        manifestFile: opts.manifest ? parseManifest(opts.manifest) : undefined,
+        mode,
+        outputPath: opts.output,
+        channel:
+            opts.beta ? 'beta'
+            : opts.insider ? 'insider'
+            : 'stable',
+        profiling: opts.profile,
         progress: opts.progress,
+        hmr: opts.hmr,
+        reactRefresh: opts.reactRefresh,
+        devtools: opts.devtools,
+        devtoolsEditorURI: opts.devtoolsEditorURI,
+        sourceMapPreference: opts.sourceMap,
+        sourceMapHideFrameworks: opts.sourceMapHideFrameworks,
     }
-    for (const i in extensionOpts) {
-        if (!extensionOpts[i]) delete extensionOpts[i]
-    }
+    applyDotEnv(extensionOpts)
     return extensionOpts
 }

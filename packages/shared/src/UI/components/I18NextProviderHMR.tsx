@@ -3,27 +3,29 @@ import { I18nextProvider, initReactI18next, type I18nextProviderProps } from 're
 import { i18NextInstance } from '@masknet/shared-base'
 
 initReactI18next.init(i18NextInstance)
-export const I18NextProviderHMR: typeof I18nextProvider =
-    process.env.NODE_ENV === 'development'
-        ? function I18NextProviderHMR({ i18n, defaultNS, children }: React.PropsWithChildren<I18nextProviderProps>) {
-              const [ns, setNS] = useState(defaultNS)
+export const I18NextProviderHMR = process.env.NODE_ENV === 'development' ? I18NextProvider_dev : I18nextProvider
 
-              useEffect(() => {
-                  const f = () => setNS('HMR')
-                  globalThis.addEventListener('MASK_I18N_HMR', f)
-                  return () => globalThis.removeEventListener('MASK_I18N_HMR', f)
-              }, [])
-              // Force trigger a re-render to apply HMR
-              if (ns === 'HMR') defaultNS = Math.random() + ''
+function I18NextProvider_dev({
+    i18n,
+    defaultNS,
+    children,
+}: React.PropsWithChildren<I18nextProviderProps>): JSX.Element {
+    const [ns, setNS] = useState(defaultNS)
 
-              useEffect(() => {
-                  if (ns === 'HMR') setNS('')
-              }, [ns])
-              // deliberately call it as a function in order to skip a React component nesting level.
-              return I18nextProvider({
-                  i18n,
-                  defaultNS,
-                  children,
-              })
-          }
-        : I18nextProvider
+    useEffect(() => {
+        const f = () => setNS('HMR')
+        globalThis.addEventListener('MASK_I18N_HMR', f)
+        return () => globalThis.removeEventListener('MASK_I18N_HMR', f)
+    }, [])
+    // Force trigger a re-render to apply HMR
+    if (ns === 'HMR') defaultNS = Math.random() + ''
+
+    useEffect(() => {
+        if (ns === 'HMR') setNS('')
+    }, [ns])
+    return (
+        <I18nextProvider i18n={i18n} defaultNS={defaultNS}>
+            {children}
+        </I18nextProvider>
+    )
+}

@@ -1,53 +1,17 @@
-import sucrase from '@rollup/plugin-sucrase'
-import { nodeResolve } from '@rollup/plugin-node-resolve'
-import commonjs from '@rollup/plugin-commonjs'
-import { terser } from 'rollup-plugin-terser'
-import json from '@rollup/plugin-json'
-import { join } from 'path'
+import { createHash } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 
-export default [
-    {
-        input: join(__dirname, './ecmascript-intl/index.ts'),
-        output: {
-            file: 'intl.js',
-            format: 'iife',
-        },
-        plugins: plugins(),
-    },
-    {
-        input: join(__dirname, './web-apis/index.ts'),
-        output: {
-            file: 'dom.js',
-            format: 'iife',
-        },
-        plugins: plugins(),
-    },
-    {
-        input: join(__dirname, './web-apis/worker.ts'),
-        output: {
-            file: 'worker.js',
-            format: 'iife',
-        },
-        plugins: plugins(),
-    },
-    {
-        input: join(__dirname, './regenerator.js'),
-        output: {
-            file: 'regenerator.js',
-            format: 'iife',
-        },
-        plugins: plugins(),
-    },
-]
-function plugins() {
-    return [
-        nodeResolve(),
-        commonjs(),
-        json(),
-        sucrase({
-            exclude: ['node_modules/**'],
-            transforms: ['typescript'],
-        }),
-        terser({ mangle: false }),
-    ]
-}
+const lockfilePath = fileURLToPath(new URL('../../pnpm-lock.yaml', import.meta.url))
+const lockfile = await readFile(lockfilePath)
+const hash = createHash('sha256')
+hash.update(lockfile)
+const polyfillVersion = 'v0' + hash.digest('hex')
+
+const versionFilePath = fileURLToPath(new URL('./dist/version.txt', import.meta.url))
+const built = (await readFile(versionFilePath, 'utf-8').catch(() => '')) === polyfillVersion
+if (built) process.exit(0)
+await mkdir(fileURLToPath(new URL('./dist/', import.meta.url))).catch(() => '')
+await writeFile(versionFilePath, polyfillVersion)
+
+export default (await import('./config.js')).default

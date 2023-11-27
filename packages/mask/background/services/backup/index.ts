@@ -1,8 +1,3 @@
-export { mobile_generateBackupJSON, generateBackupPreviewInfo, createBackupFile, type BackupOptions } from './create'
-export {
-    addUnconfirmedBackup,
-    getUnconfirmedBackup,
-    restoreUnconfirmedBackup,
-    type RestoreUnconfirmedBackupOptions,
-} from './restore'
-export { backupPersonaPrivateKey, backupPersonaMnemonicWords } from './persona'
+export { generateBackupPreviewInfo, createBackupFile, type BackupOptions } from './create.js'
+export { generateBackupSummary, restoreBackup } from './restore.js'
+export { backupPersonaPrivateKey } from './persona.js'

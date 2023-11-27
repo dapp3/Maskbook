@@ -1,45 +1,33 @@
-import { delay } from '@dimensiondev/kit'
+import { delay } from '@masknet/kit'
 import type { NormalizedBackup } from '@masknet/backup-format'
-import { ProfileIdentifier, RelationFavor } from '@masknet/shared-base'
-import { MaskMessages } from '../../../shared/messages'
+import { activatedPluginsWorker, registeredPlugins } from '@masknet/plugin-infra/background-worker'
+import { type PluginID, type ProfileIdentifier, RelationFavor, MaskMessages } from '@masknet/shared-base'
 import {
     consistentPersonaDBWriteAccess,
     createOrUpdatePersonaDB,
     createOrUpdateProfileDB,
     createOrUpdateRelationDB,
-    LinkedProfileDetails,
-} from '../../database/persona/db'
-import { withPostDBTransaction, createPostDB, PostRecord, queryPostDB, updatePostDB } from '../../database/post'
-import type { LatestRecipientDetailDB, LatestRecipientReasonDB } from '../../database/post/dbType'
+    type LinkedProfileDetails,
+} from '../../database/persona/db.js'
+import {
+    withPostDBTransaction,
+    createPostDB,
+    type PostRecord,
+    queryPostDB,
+    updatePostDB,
+} from '../../database/post/index.js'
+import type { LatestRecipientDetailDB, LatestRecipientReasonDB } from '../../database/post/dbType.js'
+import { internal_wallet_restore } from './internal_wallet_restore.js'
 
-// Well, this is a bit of a hack, because we have not move those two parts into this project yet.
-// TODO: MV3 support
-let restorePlugins: (backup: NormalizedBackup.Data['plugins']) => Promise<void>
-let restoreWallets: (backup: NormalizedBackup.WalletBackup[]) => Promise<void>
-export function delegateWalletRestore(f: typeof restoreWallets) {
-    restoreWallets = f
-}
-export function delegatePluginRestore(f: typeof restorePlugins) {
-    restorePlugins = f
-}
 export async function restoreNormalizedBackup(backup: NormalizedBackup.Data) {
     const { plugins, posts, wallets } = backup
 
-    {
-        const tag = `[Backup] Restore ${backup.personas.size} personas, ${backup.profiles.size} profiles, ${backup.relations.length} relations`
-        await restorePersonas(backup)
+    await restorePersonas(backup)
+    await restorePosts(posts.values())
+    if (wallets.length) {
+        await internal_wallet_restore(wallets)
     }
-
-    {
-        const tag = `[Backup] Restore ${backup.posts.size} posts`
-        await restorePosts(posts.values())
-    }
-    if (process.env.manifest === '2') {
-        if (wallets.length) {
-            await restoreWallets(wallets)
-        }
-        await restorePlugins(plugins)
-    }
+    await restorePlugins(plugins)
 
     // Note: it looks like the restore will not immediately available to the dashboard, maybe due to
     // serialization cost or indexedDB transaction apply cost?
@@ -76,7 +64,7 @@ async function restorePersonas(backup: NormalizedBackup.Data) {
                                 parameter: { path: mnemonic.path, withPassword: mnemonic.hasPassword },
                             }))
                             .unwrapOr(undefined),
-                        linkedProfiles: persona.linkedProfiles as Map<ProfileIdentifier, unknown> as any,
+                        linkedProfiles: persona.linkedProfiles as any,
                         // "login" again because this is the restore process.
                         // We need to explicitly set this flag because the backup may already in the database (but marked as "logout").
                         hasLogout: false,
@@ -121,7 +109,7 @@ async function restorePersonas(backup: NormalizedBackup.Data) {
 
         if (!relations.length) {
             for (const persona of personas.values()) {
-                if (persona.privateKey.none) continue
+                if (persona.privateKey.isNone()) continue
 
                 for (const profile of profiles.values()) {
                     promises.push(
@@ -148,20 +136,20 @@ function restorePosts(backup: Iterable<NormalizedBackup.PostBackup>) {
             const rec: PostRecord = {
                 identifier: post.identifier,
                 foundAt: post.foundAt,
-                postBy: post.postBy,
+                postBy: post.postBy.unwrapOr(undefined),
                 recipients: 'everyone',
             }
-            if (post.encryptBy.some) rec.encryptBy = post.encryptBy.val
-            if (post.postCryptoKey.some) rec.postCryptoKey = post.postCryptoKey.val
-            if (post.summary.some) rec.summary = post.summary.val
-            if (post.url.some) rec.url = post.url.val
+            if (post.encryptBy.isSome()) rec.encryptBy = post.encryptBy.value
+            if (post.postCryptoKey.isSome()) rec.postCryptoKey = post.postCryptoKey.value
+            if (post.summary.isSome()) rec.summary = post.summary.value
+            if (post.url.isSome()) rec.url = post.url.value
             if (post.interestedMeta.size) rec.interestedMeta = post.interestedMeta
-            if (post.recipients.some) {
-                const { val } = post.recipients
-                if (val.type === 'public') rec.recipients = 'everyone'
+            if (post.recipients.isSome()) {
+                const { value } = post.recipients
+                if (value.type === 'public') rec.recipients = 'everyone'
                 else {
                     const map = new Map<ProfileIdentifier, LatestRecipientDetailDB>()
-                    for (const [id, detail] of val.receivers) {
+                    for (const [id, detail] of value.receivers) {
                         map.set(id, {
                             reason: detail.map((x): LatestRecipientReasonDB => ({ at: x.at, type: 'direct' })),
                         })
@@ -178,4 +166,37 @@ function restorePosts(backup: Iterable<NormalizedBackup.PostBackup>) {
         }
         await Promise.all(promises)
     })
+}
+async function restorePlugins(backup: NormalizedBackup.Data['plugins']) {
+    const plugins = [...activatedPluginsWorker]
+    const works = new Set<Promise<void>>()
+    for (const [pluginID, item] of Object.entries(backup)) {
+        const plugin = plugins.find((x) => x.ID === pluginID)
+        // should we warn user here?
+        if (!plugin) {
+            if ([...registeredPlugins.getCurrentValue().map((x) => x[0])].includes(pluginID as PluginID))
+                console.warn(`[@masknet/plugin-infra] Found a backup of a not enabled plugin ${plugin}`, item)
+            else console.warn(`[@masknet/plugin-infra] Found an unknown plugin backup of ${plugin}`, item)
+            continue
+        }
+
+        const onRestore = plugin.backup?.onRestore
+        if (!onRestore) {
+            console.warn(
+                `[@masknet/plugin-infra] Found a backup of plugin ${plugin.ID} but it did not register a onRestore callback.`,
+                item,
+            )
+            continue
+        }
+        works.add(
+            (async (): Promise<void> => {
+                const result = await onRestore(item)
+                if (result.isErr()) {
+                    const msg = `[@masknet/plugin-infra] Plugin ${plugin.ID} failed to restore its backup.`
+                    throw new Error(msg, { cause: result.error })
+                }
+            })(),
+        )
+    }
+    await Promise.allSettled(works)
 }

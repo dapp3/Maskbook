@@ -1,35 +1,34 @@
-import { encodeArrayBuffer, unreachable } from '@dimensiondev/kit'
-import { AESCryptoKey, EC_Public_CryptoKey, PostIVIdentifier, ProfileIdentifier } from '@masknet/shared-base'
+import { encodeArrayBuffer, unreachable } from '@masknet/kit'
+import { type AESCryptoKey, type EC_Public_CryptoKey, PostIVIdentifier } from '@masknet/base'
 import {
     isTypedMessageText,
-    encodeTypedMessageV38Format,
+    encodeTypedMessageToDeprecatedFormat,
     encodeTypedMessageToDocument,
-    SerializableTypedMessages,
+    type SerializableTypedMessages,
 } from '@masknet/typed-message'
-import { None, Option, Some } from 'ts-results'
-import { EC_Key, encodePayload, PayloadWellFormed } from '../payload'
-import { encryptWithAES } from '../utils'
+import { None, type Option } from 'ts-results-es'
+import { type EC_Key, encodePayload, type PayloadWellFormed } from '../payload/index.js'
+import { encryptWithAES } from '../utils/index.js'
 
 import {
     EncryptError,
     EncryptErrorReasons,
-    EncryptIO,
-    EncryptOptions,
-    EncryptResult,
-    EncryptTargetE2E,
-} from './EncryptionTypes'
-import { createEphemeralKeysMap, fillIV } from './utils'
-import { v37_addReceiver } from './v37-ecdh'
-import { v38_addReceiver } from './v38-ecdh'
+    type EncryptIO,
+    type EncryptOptions,
+    type EncryptResult,
+    type EncryptTargetE2E,
+} from './EncryptionTypes.js'
+import { createEphemeralKeysMap, fillIV } from './utils.js'
+import { v37_addReceiver } from './v37-ecdh.js'
+import { v38_addReceiver } from './v38-ecdh.js'
 
-export * from './EncryptionTypes'
+export * from './EncryptionTypes.js'
 export async function encrypt(options: EncryptOptions, io: EncryptIO): Promise<EncryptResult> {
     const postIV = fillIV(io)
     const postKey = await aes256GCM(io)
     if (!postKey.usages.includes('encrypt') || !postKey.usages.includes('decrypt') || !postKey.extractable) {
         throw new EncryptError(EncryptErrorReasons.AESKeyUsageError)
     }
-    const authorPublic = queryAuthorPublicKey(options.author || null, io)
 
     const encodedMessage = encodeMessage(options.version, options.message)
     const encryptedMessage = encodedMessage
@@ -47,7 +46,7 @@ export async function encrypt(options: EncryptOptions, io: EncryptIO): Promise<E
         }
     } else {
         const postKeyEncoded = encodePostKey(options.version, postKey)
-        const context: Context = { authorPublic, postKeyEncoded, postIV }
+        const context: Context = { authorPublic: options.authorPublicKey, postKeyEncoded, postIV }
 
         if (options.version === -38) [encryption, ecdhResult] = await e2e_v38(context, options.target, io)
         else if (options.version === -37) [encryption, ecdhResult] = await e2e_v37(context, options.target, io)
@@ -57,8 +56,8 @@ export async function encrypt(options: EncryptOptions, io: EncryptIO): Promise<E
     const payload = encodePayload
         .NoSign({
             version: options.version,
-            author: options.author ? Some(options.author) : None,
-            authorPublicKey: await authorPublic,
+            author: options.author,
+            authorPublicKey: options.authorPublicKey,
             encryption,
             encrypted: await encryptedMessage,
             signature: None,
@@ -66,7 +65,7 @@ export async function encrypt(options: EncryptOptions, io: EncryptIO): Promise<E
         .then((x) => x.unwrap())
 
     return {
-        author: options.author,
+        author: options.author.unwrapOr(undefined),
         identifier: new PostIVIdentifier(options.network, encodeArrayBuffer(postIV)),
         postKey,
         output: await payload,
@@ -76,7 +75,7 @@ export async function encrypt(options: EncryptOptions, io: EncryptIO): Promise<E
 type Context = {
     postIV: Uint8Array
     postKeyEncoded: Promise<Uint8Array>
-    authorPublic: Promise<Option<EC_Key<EC_Public_CryptoKey>>>
+    authorPublic: Option<EC_Key<EC_Public_CryptoKey>>
 }
 
 /** @internal */
@@ -95,18 +94,17 @@ async function e2e_v37(
     io: EncryptIO,
 ): Promise<[PayloadWellFormed.EndToEndEncryption, EncryptResult['e2e']]> {
     const { authorPublic, postIV, postKeyEncoded } = context
-    const authorPublicKey = await authorPublic
-    if (!authorPublicKey.some) throw new EncryptError(EncryptErrorReasons.PublicKeyNotFound)
+    if (!authorPublic.isSome()) throw new EncryptError(EncryptErrorReasons.PublicKeyNotFound)
 
     const { ephemeralKeys, getEphemeralKey } = createEphemeralKeysMap(io)
     const ecdhResult = v37_addReceiver(true, { ...context, getEphemeralKey }, target, io)
 
     const ownersAESKeyEncrypted = Promise.resolve().then(async () => {
-        const [, ephemeralPrivateKey] = await getEphemeralKey(authorPublicKey.val.algr)
+        const [, ephemeralPrivateKey] = await getEphemeralKey(authorPublic.value.algr)
 
         // we get rid of localKey in v38
         const aes = await crypto.subtle.deriveKey(
-            { name: 'ECDH', public: authorPublicKey.val.key },
+            { name: 'ECDH', public: authorPublic.value.key },
             ephemeralPrivateKey,
             { name: 'AES-GCM', length: 256 },
             true,
@@ -143,7 +141,7 @@ async function e2e_v38(
         // v38 does not support ephemeral encryption.
         ephemeralPublicKey: new Map(),
         iv: postIV,
-        ownersAESKeyEncrypted: await io.encryptByLocalKey(await postKeyEncoded, postIV),
+        ownersAESKeyEncrypted: new Uint8Array(await io.encryptByLocalKey(await postKeyEncoded, postIV)),
     }
     return [encryption, ecdhResult]
 }
@@ -152,21 +150,7 @@ async function encodeMessage(version: -38 | -37, message: SerializableTypedMessa
     if (version === -37) return encodeTypedMessageToDocument(message)
     if (!isTypedMessageText(message))
         throw new EncryptError(EncryptErrorReasons.ComplexTypedMessageNotSupportedInPayload38)
-    return encodeTypedMessageV38Format(message)
-}
-async function queryAuthorPublicKey(
-    of: ProfileIdentifier | null,
-    io: EncryptIO,
-): Promise<Option<EC_Key<EC_Public_CryptoKey>>> {
-    try {
-        if (!of) return None
-        const key = await io.queryPublicKey(of)
-        if (!key) return None
-        return Some(key)
-    } catch (error) {
-        console.warn('[@masknet/encryption] Failed when query author public key', error)
-        return None
-    }
+    return encodeTypedMessageToDeprecatedFormat(message)
 }
 async function aes256GCM(io: EncryptIO): Promise<AESCryptoKey> {
     if (io.getRandomAESKey) return io.getRandomAESKey()

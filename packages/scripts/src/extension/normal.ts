@@ -1,113 +1,70 @@
-import yargs, { Argv } from 'yargs'
-const { hideBin } = require('yargs/helpers')
-import { spawn } from 'child_process'
-import { compact } from 'lodash-unified'
-import { resolve } from 'path'
-import { awaitChildProcess, PKG_PATH, watchTask } from '../utils'
-import { buildInjectedScript, watchInjectedScript } from '../projects/injected-scripts'
-import { buildMaskSDK, watchMaskSDK } from '../projects/mask-sdk'
-import { buildPolyfill } from '../projects/polyfill'
-import { buildGun } from '../projects/gun'
+import { compact } from 'lodash-es'
+import { awaitChildProcess, cleanupWhenExit, PKG_PATH, shell, task, watchTask } from '../utils/index.js'
+import { buildInjectedScript, watchInjectedScript } from '../projects/injected-scripts.js'
+import { buildMaskSDK, watchMaskSDK } from '../projects/mask-sdk.js'
+import { buildPolyfill } from '../projects/polyfill.js'
+import { buildGun } from '../projects/gun.js'
+import { parallel, series, type TaskFunction } from 'gulp'
+import { buildSentry } from '../projects/sentry.js'
+import type { BuildFlagsExtended } from './flags.js'
+import { ManifestFile } from '../../../mask/.webpack/flags.js'
 
-const presets = ['chromium', 'firefox', 'android', 'iOS', 'base'] as const
-const otherFlags = ['beta', 'insider', 'reproducible', 'profile', 'mv3', 'readonlyCache', 'progress'] as const
-
-export async function extension(f?: Function | ExtensionBuildArgs) {
-    await buildPolyfill()
-    await buildInjectedScript()
-    await buildGun()
-    await buildMaskSDK()
-    if (typeof f === 'function') return awaitChildProcess(webpack('build'))
-    return awaitChildProcess(webpack('build', f))
+export function buildWebpackFlag(name: string, args: BuildFlagsExtended) {
+    const f = () => awaitChildProcess(webpack(args))
+    const desc = 'Build webpack for ' + name
+    task(f, desc, desc)
+    return f
 }
-export async function extensionWatch(f?: Function | ExtensionBuildArgs) {
+export function buildExtensionFlag(name: string, args: BuildFlagsExtended): TaskFunction {
+    const f = series(
+        parallel(buildPolyfill, buildInjectedScript, buildGun, buildMaskSDK, buildSentry),
+        buildWebpackFlag(name, args),
+    )
+    const desc = 'Build extension for ' + name
+    task(f, desc, desc)
+    return f
+}
+export const buildBaseExtension: TaskFunction = buildExtensionFlag('default', {
+    manifestFile: ManifestFile.ChromiumMV2,
+    channel: 'stable',
+    mode: 'production',
+})
+
+export async function extensionWatch(f: Function | BuildFlagsExtended) {
+    cleanupWhenExit()
     buildPolyfill()
     buildGun()
     watchInjectedScript()
     watchMaskSDK()
-    if (typeof f === 'function') return awaitChildProcess(webpack('dev'))
-    return awaitChildProcess(webpack('dev', f))
+    buildSentry()
+    if (typeof f === 'function')
+        return awaitChildProcess(
+            webpack({
+                manifestFile: ManifestFile.ChromiumMV2,
+                channel: 'stable',
+                mode: 'development',
+            }),
+        )
+    return awaitChildProcess(webpack(f))
 }
-watchTask(extension, extensionWatch, 'webpack', 'Build Mask Network extension', {
+watchTask(buildBaseExtension, extensionWatch, 'webpack', 'Build Mask Network extension', {
     '[Warning]': 'For normal development, use task "dev" or "build"',
 })
 
-function parseArgs() {
-    const a = yargs(hideBin(process.argv))
-    for (const i of presets) a.option(i, { type: 'boolean' })
-    for (const i of otherFlags) a.option(i, { type: 'boolean' })
-    const b = a as Argv<Record<typeof presets[number] | typeof otherFlags[number], boolean>>
-    return b.string('output-path')
-}
-export type ExtensionBuildArgs = Partial<ReturnType<typeof parseArgs>['argv']>
-function webpack(mode: 'dev' | 'build', args: ExtensionBuildArgs = parseArgs().argv) {
+function webpack(flags: BuildFlagsExtended) {
     const command = [
-        'webpack',
-        mode === 'dev' ? 'serve' : undefined,
+        JSON.stringify(process.execPath),
+        '--loader',
+        'ts-node/esm/transpile-only',
+        'node_modules/webpack/bin/webpack.js',
+        flags.mode === 'development' ? 'serve' : undefined,
         '--mode',
-        mode === 'dev' ? 'development' : 'production',
-        args.progress && '--progress',
-        args.profile && '--profile',
+        flags.mode === 'development' ? 'development' : 'production',
+        flags.progress && '--progress',
+        flags.profiling && '--profile',
         // this command runs in the /packages/mask folder.
-        args.profile && '--json=../../compilation-stats.json',
+        flags.profiling && '--json=../../compilation-stats.json',
     ]
-    const flags: BuildFlags = {
-        channel: 'stable',
-        mode: mode === 'dev' ? 'development' : 'production',
-        runtime: { architecture: 'web', engine: 'chromium', manifest: 2 },
-    }
-    if (args.reproducible) flags.reproducibleBuild = true
-    if (args.readonlyCache) flags.readonlyCache = true
-    if (args.profile) flags.profiling = true
-    if (args['output-path']) flags.outputPath = args['output-path']
-
-    if (args.mv3) {
-        flags.runtime.manifest = 3
-        if (args.android || args.iOS || args.firefox) throw new Error("Current engine doesn't support MV3.")
-    }
-
-    if (args.insider) flags.channel = 'insider'
-    else if (args.beta) flags.channel = 'beta'
-
-    if (args.iOS) {
-        flags.runtime.engine = 'safari'
-        flags.runtime.architecture = 'app'
-    } else if (args.firefox) {
-        flags.runtime.engine = 'firefox'
-        flags.runtime.architecture = 'web'
-    } else if (args.android) {
-        flags.runtime.engine = 'firefox'
-        flags.runtime.architecture = 'app'
-    } else if (args.chromium || args.base) {
-        flags.runtime.engine = 'chromium'
-        flags.runtime.architecture = 'web'
-    }
-
     command.push('--env', 'flags=' + Buffer.from(JSON.stringify(flags), 'utf-8').toString('hex'))
-    return spawn('npx', compact(command), {
-        cwd: resolve(PKG_PATH, 'mask'),
-        stdio: 'inherit',
-        shell: true,
-    })
-}
-export interface Runtime {
-    engine: 'chromium' | 'firefox' | 'safari'
-    architecture: 'web' | 'app'
-    manifest: 2 | 3
-}
-export interface BuildFlags {
-    channel: 'stable' | 'beta' | 'insider'
-    runtime: Runtime
-    mode: 'development' | 'production'
-    /** @default false */
-    profiling?: boolean
-    /** @default true in development */
-    hmr?: boolean
-    /** @default true in development and hmr is true */
-    reactRefresh?: boolean
-    /** @default false */
-    readonlyCache?: boolean
-    /** @default false */
-    reproducibleBuild?: boolean
-    outputPath?: string
+    return shell.cwd(new URL('mask', PKG_PATH))([compact(command).join(' ')])
 }

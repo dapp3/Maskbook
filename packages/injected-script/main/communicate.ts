@@ -1,48 +1,55 @@
-import { CustomEventId, decodeEvent } from '../shared'
-import { instagramUpload } from './EventListenerPatch/instagramUpload'
-import { getCustomEventDetail, apply, warn } from './intrinsic'
-import { dispatchInput } from './EventListenerPatch/dispatchInput'
-import { dispatchPaste } from './EventListenerPatch/dispatchPaste'
-import { dispatchPasteImage } from './EventListenerPatch/dispatchPasteImage'
-import { callRequest, access, bindEvent, execute, until } from './GlobalVariableBridge'
-import { hookInputUploadOnce } from './EventListenerPatch/hookInputUploadOnce'
+import { CustomEventId, decodeEvent } from '../shared/index.js'
+import { instagramUpload } from './Patches/instagramUpload.js'
+import { $, $safe } from './intrinsic.js'
+import { dispatchInput } from './Patches/dispatchInput.js'
+import { dispatchPaste } from './Patches/dispatchPaste.js'
+import { dispatchPasteImage } from './Patches/dispatchPasteImage.js'
+import {
+    __unsafe__callRequest,
+    __unsafe__getValue,
+    __unsafe__onEvent,
+    __unsafe__call,
+    __unsafe__until,
+} from './GlobalVariableBridge/index.js'
+import { hookInputUploadOnce } from './Patches/hookInputUploadOnce.js'
 
 document.addEventListener(CustomEventId, (e) => {
-    const r = decodeEvent(getCustomEventDetail(e as CustomEvent))
+    const [type, args] = $.setPrototypeOf(decodeEvent($.CustomEvent_detail(e as CustomEvent)), $safe.ArrayPrototype)
+    $.setPrototypeOf(args, $safe.ArrayPrototype)
+    if (args.length < 1) return
 
-    if (r[1].length < 1) return
-
-    switch (r[0]) {
-        case 'input':
-            return apply(dispatchInput, null, r[1])
-        case 'paste':
-            return apply(dispatchPaste, null, r[1])
-        case 'instagramUpload':
-            return apply(instagramUpload, null, r[1])
-        case 'pasteImage':
-            return apply(dispatchPasteImage, null, r[1])
-        case 'hookInputUploadOnce':
-            return apply(hookInputUploadOnce, null, r[1])
+    switch (type) {
         case 'rejectPromise':
         case 'resolvePromise':
             return
 
+        case 'input':
+            return dispatchInput(...args)
+        case 'paste':
+            return dispatchPaste(...args)
+        case 'instagramUpload':
+            return instagramUpload(...args)
+        case 'pasteImage':
+            return dispatchPasteImage(...args)
+        case 'hookInputUploadOnce':
+            return hookInputUploadOnce(...args)
+
         // web3
         case 'web3BridgeBindEvent':
-            return apply(bindEvent, null, r[1])
+            return __unsafe__onEvent(...args)
         case 'web3BridgeEmitEvent':
             return
         case 'web3BridgeSendRequest':
-            return apply(callRequest, null, r[1])
+            return __unsafe__callRequest(...args)
         case 'web3BridgePrimitiveAccess':
-            return apply(access, null, r[1])
+            return __unsafe__getValue(...args)
         case 'web3UntilBridgeOnline':
-            return apply(until, null, r[1])
+            return __unsafe__until(...args)
         case 'web3BridgeExecute':
-            return apply(execute, null, r[1])
+            return __unsafe__call(...args)
 
         default:
-            const neverEvent: never = r[0]
-            warn('[@masknet/injected-script]', neverEvent, 'not handled')
+            const neverEvent: never = type
+            $.ConsoleError('[@masknet/injected-script]', neverEvent, 'not handled')
     }
 })

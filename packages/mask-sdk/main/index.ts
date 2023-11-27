@@ -1,24 +1,21 @@
-import { readyPromise } from './bridge'
-import { persona } from './persona'
-import { SocialNetwork } from './socialNetwork'
+import type { Mask } from '../public-api/index.js'
+import { contentScript, readyPromise } from './bridge.js'
+import { ethereum } from './wallet.js'
 
 document.currentScript?.remove()
-readyPromise.then((init) => {
-    const MaskSDK: typeof Mask = {
+const promise = readyPromise.then((init) => {
+    const MaskSDK: {
+        [key in keyof typeof Mask as undefined extends (typeof Mask)[key] ? never : key]: (typeof Mask)[key]
+    } & { reload?(): Promise<void> } = {
         sdkVersion: 0,
-        credentials: {} as any,
-        ethereum: {} as any,
-        socialNetwork: new SocialNetwork(init),
-        persona,
+        ethereum,
     }
 
-    try {
-        // @ts-expect-error
-        if (process.env.NODE_ENV === 'development') {
-            // @ts-expect-error
-            MaskSDK.reload = () => document.dispatchEvent(new Event('mask-sdk-reload'))
-        }
-    } catch {}
+    if (init.debuggerMode) MaskSDK.reload = () => contentScript.reload()
 
-    Reflect.set(globalThis, 'Mask', MaskSDK)
+    Object.assign(globalThis, { Mask: MaskSDK })
+    return MaskSDK
 })
+if (!('Mask' in globalThis)) Object.assign(globalThis, { Mask: promise })
+
+undefined

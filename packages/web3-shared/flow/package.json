@@ -1,21 +1,21 @@
 {
   "name": "@masknet/web3-shared-flow",
   "private": true,
+  "sideEffects": false,
+  "type": "module",
   "exports": {
     ".": {
-      "webpack": "./index.ts",
-      "default": "../dist/flow/index.js"
+      "types": "./dist/index.d.js",
+      "mask-src": "./src/index.ts",
+      "default": "./dist/index.js"
     }
   },
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.js",
   "dependencies": {
-    "@blocto/fcl": "^0.0.78-alpha.10",
-    "@masknet/shared-base": "workspace:*",
-    "@masknet/web3-constants": "workspace:*",
-    "@masknet/web3-shared-base": "workspace:*",
-    "@onflow/types": "^0.0.5",
-    "bignumber.js": "9.0.2",
-    "react-use": "^17.4.0",
-    "urlcat": "^2.0.4"
+    "@blocto/fcl": "^1.4.0",
+    "@masknet/shared-base": "workspace:^",
+    "@masknet/web3-constants": "workspace:^",
+    "@masknet/web3-shared-base": "workspace:^",
+    "react-use": "^17.4.0"
   }
 }

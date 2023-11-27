@@ -1,24 +1,19 @@
-import { queryAvatarDB, isAvatarOutdatedDB, storeAvatarDB, IdentifierWithAvatar, createAvatarDBAccess } from './db'
-import { hasNativeAPI, nativeAPI } from '../../../shared/native-rpc'
-import { blobToDataURL, memoizePromise } from '@dimensiondev/kit'
-import { createTransaction } from '../utils/openDB'
+import {
+    queryAvatarDB,
+    isAvatarOutdatedDB,
+    storeAvatarDB,
+    type IdentifierWithAvatar,
+    createAvatarDBAccess,
+    queryAvatarMetaDataDB,
+} from './db.js'
+import { blobToDataURL, memoizePromise } from '@masknet/kit'
+import { createTransaction } from '../utils/openDB.js'
+import { memoize } from 'lodash-es'
+import type { PersonaIdentifier } from '@masknet/shared-base'
 
-/**
- * Get a (cached) blob url for an identifier. No cache for native api.
- * ? Because of cross-origin restrictions, we cannot use blob url here. sad :(
- */
-async function nativeImpl(identifiers: IdentifierWithAvatar[]): Promise<Map<IdentifierWithAvatar, string>> {
-    const map = new Map<IdentifierWithAvatar, string>(new Map())
-    await Promise.allSettled(
-        identifiers.map(async (id) => {
-            const result = await nativeAPI!.api.query_avatar({ identifier: id.toText() })
-            result && map.set(id, result)
-        }),
-    )
-    return map
-}
-const indexedDBImpl = memoizePromise(
-    async function (identifiers: IdentifierWithAvatar[]): Promise<Map<IdentifierWithAvatar, string>> {
+const impl = memoizePromise(
+    memoize,
+    async function (identifiers: readonly IdentifierWithAvatar[]): Promise<Map<IdentifierWithAvatar, string>> {
         const promises: Array<Promise<unknown>> = []
 
         const map = new Map<IdentifierWithAvatar, string>()
@@ -27,7 +22,12 @@ const indexedDBImpl = memoizePromise(
             // Must not await here. Because we insert non-idb async operation (blobToDataURL).
             promises.push(
                 queryAvatarDB(t, id)
-                    .then((buffer) => buffer && blobToDataURL(new Blob([buffer], { type: 'image/png' })))
+                    .then((avatar) => {
+                        if (!avatar) return
+                        return typeof avatar === 'string' ? avatar : (
+                                blobToDataURL(new Blob([avatar], { type: 'image/png' }))
+                            )
+                    })
                     .then((url) => url && map.set(id, url)),
             )
         }
@@ -35,10 +35,25 @@ const indexedDBImpl = memoizePromise(
         await Promise.allSettled(promises)
         return map
     },
-    (id) => id.flatMap((x) => x.toText()).join(';'),
+    (id: IdentifierWithAvatar[]) => id.flatMap((x) => x.toText()).join(';'),
 )
-export const queryAvatarsDataURL: (identifiers: IdentifierWithAvatar[]) => Promise<Map<IdentifierWithAvatar, string>> =
-    hasNativeAPI ? nativeImpl : indexedDBImpl
+
+const queryAvatarLastUpdateTimeImpl = memoizePromise(
+    memoize,
+    async (identifier: IdentifierWithAvatar) => {
+        const t = createTransaction(await createAvatarDBAccess(), 'readonly')('metadata')
+        const metadata = await queryAvatarMetaDataDB(t, identifier)
+        return metadata?.lastUpdateTime
+    },
+    (x) => x,
+)
+
+export const queryAvatarsDataURL: (
+    identifiers: readonly IdentifierWithAvatar[],
+) => Promise<Map<IdentifierWithAvatar, string>> = impl
+
+export const queryAvatarLastUpdateTime: (identifier: PersonaIdentifier) => Promise<Date | undefined> =
+    queryAvatarLastUpdateTimeImpl
 
 /**
  * Store an avatar with a url for an identifier.
@@ -48,12 +63,6 @@ export const queryAvatarsDataURL: (identifiers: IdentifierWithAvatar[]) => Promi
 
 export async function storeAvatar(identifier: IdentifierWithAvatar, avatar: ArrayBuffer | string): Promise<void> {
     try {
-        if (hasNativeAPI) {
-            // ArrayBuffer is unreachable on Native side.
-            if (typeof avatar !== 'string') return
-            await nativeAPI?.api.store_avatar({ identifier: identifier.toText(), avatar: avatar as string })
-            return
-        }
         if (typeof avatar === 'string') {
             if (avatar.startsWith('https') === false) return
             const isOutdated = await isAvatarOutdatedDB(
@@ -63,7 +72,10 @@ export async function storeAvatar(identifier: IdentifierWithAvatar, avatar: Arra
             )
             if (isOutdated) {
                 // ! must fetch before create the transaction
-                const buffer = await (await fetch(avatar)).arrayBuffer()
+                const buffer = await fetch(avatar).then(
+                    (r) => r.arrayBuffer(),
+                    () => avatar,
+                )
                 {
                     const t = createTransaction(await createAvatarDBAccess(), 'readwrite')('avatars', 'metadata')
                     await storeAvatarDB(t, identifier, buffer)
@@ -77,6 +89,7 @@ export async function storeAvatar(identifier: IdentifierWithAvatar, avatar: Arra
     } catch (error) {
         console.error('[AvatarDB] Store avatar failed', error)
     } finally {
-        indexedDBImpl.cache.clear()
+        queryAvatarLastUpdateTimeImpl.cache.clear()
+        impl.cache.clear()
     }
 }

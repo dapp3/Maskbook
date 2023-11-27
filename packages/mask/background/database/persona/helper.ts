@@ -1,13 +1,12 @@
-import { safeUnreachable } from '@dimensiondev/kit'
+import { safeUnreachable } from '@masknet/kit'
 import {
-    AESCryptoKey,
-    AESJsonWebKey,
+    type AESCryptoKey,
+    type AESJsonWebKey,
     ECKeyIdentifier,
-    ECKeyIdentifierFromJsonWebKey,
-    EC_Private_JsonWebKey,
-    EC_Public_CryptoKey,
-    EC_Public_JsonWebKey,
-    PersonaIdentifier,
+    type EC_Private_JsonWebKey,
+    type EC_Public_CryptoKey,
+    type EC_Public_JsonWebKey,
+    type PersonaIdentifier,
     ProfileIdentifier,
 } from '@masknet/shared-base'
 import {
@@ -16,13 +15,14 @@ import {
     createOrUpdatePersonaDB,
     createPersonaDB,
     createPersonaDBReadonlyAccess,
-    FullPersonaDBTransaction,
-    LinkedProfileDetails,
-    PersonaRecord,
+    type FullPersonaDBTransaction,
+    type LinkedProfileDetails,
+    type PersonaRecord,
     queryPersonaByProfileDB,
     queryPersonasWithPrivateKey,
     queryProfileDB,
-} from './db'
+} from './db.js'
+import { noop } from 'lodash-es'
 
 // #region Local key helpers
 /**
@@ -49,7 +49,7 @@ export async function decryptByLocalKey(
     authorHint: ProfileIdentifier | null,
     data: Uint8Array,
     iv: Uint8Array,
-): Promise<Uint8Array> {
+): Promise<ArrayBuffer> {
     const candidateKeys: AESJsonWebKey[] = []
 
     if (authorHint) {
@@ -60,13 +60,13 @@ export async function decryptByLocalKey(
         // TODO: We may push every local key we owned to the candidate list so we can also decrypt when authorHint is null, but that might be a performance pitfall when localKey field is not indexed.
     }
 
-    let check = () => {}
+    let check = noop
     return Promise.any(
-        candidateKeys.map(async (key): Promise<Uint8Array> => {
+        candidateKeys.map(async (key): Promise<ArrayBuffer> => {
             const k = await crypto.subtle.importKey('jwk', key, { name: 'AES-GCM', length: 256 }, false, ['decrypt'])
             check()
 
-            const result: Uint8Array = await crypto.subtle.decrypt({ iv, name: 'AES-GCM' }, k, data)
+            const result = await crypto.subtle.decrypt({ iv, name: 'AES-GCM' }, k, data)
             check = abort
             return result
         }),
@@ -99,7 +99,8 @@ async function getLocalKeyOf(id: ProfileIdentifier, tx: FullPersonaDBTransaction
 
 // #region ECDH
 export async function deriveAESByECDH(pub: EC_Public_CryptoKey, of?: ProfileIdentifier | PersonaIdentifier) {
-    const curve = (pub.algorithm as EcKeyAlgorithm).namedCurve || ''
+    // Note: the correct type should be EcKeyAlgorithm but it is missing in worker dts
+    const curve = (pub.algorithm as EcKeyImportParams).namedCurve || ''
     const sameCurvePrivateKeys = new Map<ECKeyIdentifier, EC_Private_JsonWebKey>()
 
     await createPersonaDBReadonlyAccess(async (tx) => {
@@ -124,7 +125,7 @@ export async function deriveAESByECDH(pub: EC_Public_CryptoKey, of?: ProfileIden
             const privateKey = await crypto.subtle.importKey(
                 'jwk',
                 key,
-                { name: 'ECDH', namedCurve: key.crv! } as EcKeyAlgorithm,
+                { name: 'ECDH', namedCurve: key.crv! },
                 false,
                 ['deriveKey'],
             )
@@ -155,7 +156,7 @@ export async function createPersonaByJsonWebKey(options: {
     mnemonic?: PersonaRecord['mnemonic']
     uninitialized?: boolean
 }): Promise<PersonaIdentifier> {
-    const identifier = await ECKeyIdentifierFromJsonWebKey(options.publicKey)
+    const identifier = (await ECKeyIdentifier.fromJsonWebKey(options.publicKey)).unwrap()
     const record: PersonaRecord = {
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -184,7 +185,7 @@ export async function createProfileWithPersona(
         mnemonic?: PersonaRecord['mnemonic']
     },
 ): Promise<void> {
-    const ec_id = await ECKeyIdentifierFromJsonWebKey(keys.publicKey)
+    const ec_id = (await ECKeyIdentifier.fromJsonWebKey(keys.publicKey)).unwrap()
     const rec: PersonaRecord = {
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -211,7 +212,7 @@ export async function queryPublicKey(author: ProfileIdentifier | null) {
     return (await crypto.subtle.importKey(
         'jwk',
         persona.publicKey,
-        { name: 'ECDH', namedCurve: persona.publicKey.crv! } as EcKeyAlgorithm,
+        { name: 'ECDH', namedCurve: persona.publicKey.crv! },
         true,
         ['deriveKey'],
     )) as EC_Public_CryptoKey

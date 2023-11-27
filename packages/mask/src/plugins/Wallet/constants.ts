@@ -1,1 +1,0 @@
-export { PLUGIN_ID, HD_PATH_WITHOUT_INDEX_ETHEREUM, UPDATE_CHAIN_STATE_DELAY } from '@masknet/plugin-wallet'

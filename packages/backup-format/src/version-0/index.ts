@@ -1,24 +1,23 @@
 import {
-    AESJsonWebKey,
-    ECKeyIdentifierFromJsonWebKey,
-    EC_Private_JsonWebKey,
-    EC_Public_JsonWebKey,
+    type AESJsonWebKey,
+    type EC_Private_JsonWebKey,
+    type EC_Public_JsonWebKey,
     isAESJsonWebKey,
     isEC_Private_JsonWebKey,
-    isEC_Public_JsonWebKey,
+    isEC_JsonWebKey,
     ProfileIdentifier,
+    ECKeyIdentifier,
 } from '@masknet/shared-base'
-import { isObjectLike } from 'lodash-unified'
-import { None, Some } from 'ts-results'
-import { createEmptyNormalizedBackup } from '../normalize'
-import type { NormalizedBackup } from '../normalize/type'
+import { isObjectLike } from 'lodash-es'
+import { None, Some } from 'ts-results-es'
+import { createEmptyNormalizedBackup } from '../normalize/index.js'
+import type { NormalizedBackup } from '../normalize/type.js'
 
 export function isBackupVersion0(obj: unknown): obj is BackupJSONFileVersion0 {
     if (!isObjectLike(obj)) return false
     try {
         const data: BackupJSONFileVersion0 = obj as any
-        if (!data.local || !data.key || !data.key.key || !data.key.key.privateKey || !data.key.key.publicKey)
-            return false
+        if (!data.local || !data.key?.key?.privateKey || !data.key.key.publicKey) return false
         return true
     } catch {
         return false
@@ -33,10 +32,10 @@ export async function normalizeBackupVersion0(file: BackupJSONFileVersion0): Pro
     const { username, key } = file.key
     const { publicKey, privateKey } = key
 
-    if (!isEC_Public_JsonWebKey(publicKey)) return backup
+    if (!isEC_JsonWebKey(publicKey)) return backup
 
     const persona: NormalizedBackup.PersonaBackup = {
-        identifier: await ECKeyIdentifierFromJsonWebKey(publicKey),
+        identifier: (await ECKeyIdentifier.fromJsonWebKey(publicKey)).unwrap(),
         publicKey,
         linkedProfiles: new Map(),
         localKey: isAESJsonWebKey(local) ? Some(local) : None,
@@ -45,12 +44,14 @@ export async function normalizeBackupVersion0(file: BackupJSONFileVersion0): Pro
         nickname: None,
         createdAt: None,
         updatedAt: None,
+        address: None,
     }
     backup.personas.set(persona.identifier, persona)
 
-    if (username && username !== '$unknown' && username !== '$local') {
+    const identifier = ProfileIdentifier.of('facebook.com', username)
+    if (identifier.isSome()) {
         const profile: NormalizedBackup.ProfileBackup = {
-            identifier: ProfileIdentifier.of('facebook.com', username).unwrap(),
+            identifier: identifier.value,
             linkedPersona: Some(persona.identifier),
             createdAt: None,
             updatedAt: None,

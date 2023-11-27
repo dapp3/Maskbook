@@ -3,10 +3,13 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "../dist/shared/",
-    "tsBuildInfoFile": "../dist/shared.tsbuildinfo",
-    "emitDeclarationOnly": true,
-    "lib": ["ES2021"]
+    "tsBuildInfoFile": "../dist/shared.tsbuildinfo"
   },
-  "include": ["./"],
-  "references": [{ "path": "../../shared-base" }, { "path": "../../plugin-infra" }]
+  "include": ["./**/*"],
+  "exclude": ["./plugin-infra/register.js"],
+  "references": [
+    { "path": "../../shared-base/tsconfig.json" },
+    { "path": "../../plugin-infra/tsconfig.json" },
+    { "path": "../../sandboxed-plugin-runtime/src/runtime/tsconfig.json" }
+  ]
 }

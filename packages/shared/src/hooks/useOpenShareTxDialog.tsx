@@ -1,12 +1,12 @@
-import { useChainId } from '@masknet/plugin-infra/web3'
-import { makeStyles } from '@masknet/theme'
-import { NetworkPluginID } from '@masknet/web3-shared-base'
-import { explorerResolver } from '@masknet/web3-shared-evm'
-import DoneIcon from '@mui/icons-material/Done'
+import { memo, useCallback } from 'react'
+import { Done as DoneIcon } from '@mui/icons-material'
 import { Link, Typography } from '@mui/material'
-import { FC, memo, useCallback } from 'react'
-import { useShowConfirm } from '../contexts/common'
-import { useSharedI18N } from '../locales'
+import { makeStyles } from '@masknet/theme'
+import { useChainContext } from '@masknet/web3-hooks-base'
+import type { NetworkPluginID } from '@masknet/shared-base'
+import { EVMExplorerResolver } from '@masknet/web3-providers'
+import { useSharedTrans } from '../locales/index.js'
+import { ConfirmModal } from '../UI/modals/index.js'
 
 const useStyles = makeStyles()((theme) => ({
     content: {
@@ -28,9 +28,7 @@ const useStyles = makeStyles()((theme) => ({
         fontSize: 18,
         marginTop: theme.spacing(1),
     },
-    secondary: {
-        fontSize: 14,
-    },
+    secondary: {},
 }))
 
 interface ShareTransactionOptions {
@@ -45,42 +43,41 @@ interface ShareTransactionOptions {
 
 type ShareTransactionProps = Omit<ShareTransactionOptions, 'title' | 'onShare'>
 
-const ShareTransaction: FC<ShareTransactionProps> = memo(({ message, content, hash }) => {
+const ShareTransaction = memo(({ message, content, hash }: ShareTransactionProps) => {
     const { classes } = useStyles()
-    const t = useSharedI18N()
-    const chainId = useChainId(NetworkPluginID.PLUGIN_EVM)
-    const link = explorerResolver.transactionLink(chainId, hash)
+    const t = useSharedTrans()
+    const { chainId } = useChainContext<NetworkPluginID.PLUGIN_EVM>()
+    const link = EVMExplorerResolver.transactionLink(chainId, hash)
     return (
         <div className={classes.content}>
             <DoneIcon className={classes.icon} />
-            {message ? (
+            {message ?
                 <Typography className={classes.primary} color="textPrimary" variant="subtitle1">
                     {message}
                 </Typography>
-            ) : null}
-            {content ? (
+            :   null}
+            {content ?
                 <Typography className={classes.secondary} color="textSecondary">
                     {content}
                 </Typography>
-            ) : null}
-            {link ? (
+            :   null}
+            {link ?
                 <Typography>
                     <Link className={classes.link} href={link} target="_blank" rel="noopener noreferrer">
                         {t.share_dialog_view_on_explorer()}
                     </Link>
                 </Typography>
-            ) : null}
+            :   null}
         </div>
     )
 })
 
 export function useOpenShareTxDialog() {
-    const showConfirm = useShowConfirm()
-    const t = useSharedI18N()
+    const t = useSharedTrans()
 
     return useCallback(
-        ({ title, message, content, hash, buttonLabel, onShare }: ShareTransactionOptions) => {
-            return showConfirm({
+        async ({ title, message, content, hash, buttonLabel, onShare }: ShareTransactionOptions) => {
+            const confirmed = await ConfirmModal.openAndWaitForClose({
                 title: title ?? t.share_dialog_transaction(),
                 content: (
                     <ShareTransaction
@@ -90,11 +87,9 @@ export function useOpenShareTxDialog() {
                     />
                 ),
                 confirmLabel: onShare ? buttonLabel ?? t.dialog_share() : t.dialog_dismiss(),
-                onSubmit() {
-                    onShare?.()
-                },
             })
+            if (confirmed) onShare?.()
         },
-        [t, showConfirm],
+        [t],
     )
 }

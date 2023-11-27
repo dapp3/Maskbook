@@ -1,109 +1,63 @@
-import { CustomEventId, encodeEvent, InternalEvents } from '../shared'
-import {
-    error,
-    _XPCNativeWrapper,
-    no_xray_Proxy,
-    no_xray_DataTransfer,
-    no_xray_CustomEvent,
-    apply,
-    dispatchEvent,
-} from './intrinsic'
+import { CustomEventId, encodeEvent, type InternalEvents } from '../shared/index.js'
+import * as $ from './intrinsic_content.js'
+import * as $unsafe from './intrinsic_unsafe.js'
+import * as $safe from './intrinsic_blessed.js'
 
-const { Blob: no_xray_Blob, File: no_xray_File } = globalThis.window
-const EventTargetPrototype = globalThis.window.EventTarget.prototype
-const { now } = Date
-// Firefox magics!
-export function overwriteFunctionOnXRayObject<T extends object>(
-    xray_object: T,
-    defineAs: keyof T,
-    apply: (target: any, thisArg: any, argArray?: any) => any,
-) {
-    try {
-        if (_XPCNativeWrapper) {
-            const rawObject = _XPCNativeWrapper.unwrap(xray_object)
-            const rawFunction = rawObject[defineAs]
-            exportFunction!(
-                function (this: any) {
-                    return apply(rawFunction, this, arguments)
-                },
-                rawObject,
-                { defineAs },
-            )
-            return
-        }
-    } catch {
-        error('Redefine failed. Try to use Proxy as fallback.')
+export function PatchDescriptor(patchedProps: PropertyDescriptorMap & NullPrototype, targetPrototype: object) {
+    const __unsafe__targetPrototype = $unsafe.unwrapXRayVision(targetPrototype)
+    const targetDescriptor = $.getOwnPropertyDescriptors(targetPrototype)
+    for (const key in patchedProps) {
+        if (key === 'constructor') continue
+        const desc = patchedProps[key]
+        const oldDesc = { ...targetDescriptor[key] }
+        if (!oldDesc.configurable) continue
+        desc.configurable = true
+        desc.enumerable = oldDesc.enumerable
+        if ('writable' in oldDesc) desc.writable = oldDesc.writable
+        if ($.hasOwn(desc, 'value') && desc.value) desc.value = $unsafe.expose(desc.value, oldDesc.value)
+        if ($.hasOwn(desc, 'get') && desc.get) desc.get = $unsafe.expose(desc.get!, oldDesc.get!)
+        if ($.hasOwn(desc, 'set') && desc.set) desc.set = $unsafe.expose(desc.set!, oldDesc.set!)
+        try {
+            $.defineProperty(__unsafe__targetPrototype, key, desc)
+        } catch {}
     }
-    xray_object[defineAs] = new no_xray_Proxy(xray_object[defineAs], { apply })
 }
 
-export function redefineEventTargetPrototype<K extends keyof EventTarget>(
-    defineAs: K,
-    apply: NonNullable<ProxyHandler<EventTarget[K]>['apply']>,
-) {
-    overwriteFunctionOnXRayObject(EventTargetPrototype, defineAs, apply)
+export function PatchDescriptor_NonNull(patchedProps: PropertyDescriptorMap, targetPrototype: object) {
+    $.setPrototypeOf(patchedProps, null)
+    PatchDescriptor(patchedProps as PropertyDescriptorMap & NullPrototype, targetPrototype)
 }
 
-/** get the xray-unwrapped version of a C++ binding object */
-export function unwrapXRay_CPPBindingObject<T>(x: T) {
-    if (_XPCNativeWrapper) return _XPCNativeWrapper.unwrap(x)
-    return x
-}
-
-/** Clone a object into the page realm */
-export function clone_into<T>(x: T) {
-    if (_XPCNativeWrapper && typeof cloneInto === 'function') return cloneInto(x, window, { cloneFunctions: true })
-    return x
-}
-
-export function constructXrayUnwrappedDataTransferProxy(xrayUnwrappedFile: File) {
-    return new no_xray_Proxy(
-        new no_xray_DataTransfer(),
-        clone_into({
-            get(target, key: keyof DataTransfer) {
-                if (key === 'files') return clone_into([xrayUnwrappedFile])
-                if (key === 'types') return clone_into(['Files'])
-                if (key === 'items')
-                    return clone_into([
-                        {
-                            kind: 'file',
-                            type: 'image/png',
-                            getAsFile() {
-                                return xrayUnwrappedFile
-                            },
-                        },
-                    ])
-                if (key === 'getData') return clone_into(() => '')
-                return target[key]
-            },
-        }),
-    )
-}
-
-export function constructXrayUnwrappedFilesFromUintLike(
-    format: string,
-    fileName: string,
-    xray_fileContent: number[] | Uint8Array,
-) {
-    const binary = unwrapXRay_CPPBindingObject(Uint8Array.from(xray_fileContent))
-    const blob = new no_xray_Blob([binary], { type: format })
-    const file = new no_xray_File([blob], fileName, {
-        lastModified: now(),
+export function contentFileFromBufferSource(format: string, fileName: string, xray_fileContent: number[] | Uint8Array) {
+    const binary = $.Uint8Array_from(xray_fileContent)
+    const blob = new $.Blob($safe.Array_of(binary), {
+        __proto__: null,
         type: format,
     })
-    return file
+    const file = new $.File($safe.Array_of(blob), fileName, {
+        __proto__: null,
+        lastModified: $.DateNow(),
+        type: format,
+    })
+    return $unsafe.structuredCloneFromSafe(file)
 }
 
 function getError(message: any) {
     try {
-        return { message: message.message }
+        return {
+            __proto__: null,
+            message: $.String(message.message),
+        }
     } catch {
-        return { message: 'unknown error' }
+        return {
+            __proto__: null,
+            message: 'unknown error',
+        }
     }
 }
-export async function handlePromise(id: number, promise: () => any) {
+export async function handlePromise(id: number, f: () => any) {
     try {
-        const data = await promise()
+        const data = await $.setPrototypeOf($.PromiseResolve(f()), $safe.PromisePrototype)
         sendEvent('resolvePromise', id, data)
     } catch (error) {
         sendEvent('rejectPromise', id, getError(error))
@@ -111,6 +65,21 @@ export async function handlePromise(id: number, promise: () => any) {
 }
 
 export function sendEvent<T extends keyof InternalEvents>(event: T, ...args: InternalEvents[T]) {
+    $.setPrototypeOf(args, null)
     const detail = encodeEvent(event, args)
-    apply(dispatchEvent, document, [new no_xray_CustomEvent(CustomEventId, { detail })])
+    $.dispatchEvent(
+        document,
+        new $.CustomEvent(CustomEventId, {
+            __proto__: null,
+            detail,
+        }),
+    )
 }
+
+export function isTwitter() {
+    const url = new $.URL(window.location.href)
+    return $.StringInclude($.URL_origin(url), 'twitter.com')
+}
+
+export function noop() {}
+Object.freeze(noop)

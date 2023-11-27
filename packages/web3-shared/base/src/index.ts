@@ -1,3 +1,2 @@
-export * from './specs'
-export * from './utils'
-export * from './proxy'
+export * from './specs/index.js'
+export * from './helpers/index.js'

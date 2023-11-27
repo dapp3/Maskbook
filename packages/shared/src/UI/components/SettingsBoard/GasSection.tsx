@@ -1,30 +1,24 @@
 import { useState } from 'react'
-import BigNumber from 'bignumber.js'
 import { makeStyles, MaskTabList } from '@masknet/theme'
-import { useSharedI18N } from '@masknet/shared'
+import { useSharedTrans } from '@masknet/shared'
 import { TabContext } from '@mui/lab'
 import { Tab, Typography } from '@mui/material'
-import { NetworkPluginID } from '@masknet/web3-shared-base'
-import { ChainId, formatWeiToGwei, Transaction } from '@masknet/web3-shared-evm'
-import { GasOptionSelector } from './GasOptionSelector'
-import { SettingsContext } from './Context'
-import { Section } from './Section'
-import { GasForm } from './GasForm'
-
-enum GasSettingsType {
-    Basic = 'Basic',
-    Advanced = 'Advanced',
-}
+import { NetworkPluginID } from '@masknet/shared-base'
+import { GasOptionType, isZero, plus, formatCurrency } from '@masknet/web3-shared-base'
+import { type ChainId, formatGweiToWei, formatWeiToGwei, type Transaction } from '@masknet/web3-shared-evm'
+import { EVMUtils } from '@masknet/web3-providers'
+import { GasOptionSelector } from './GasOptionSelector.js'
+import { SettingsContext } from './Context.js'
+import { Section } from './Section.js'
+import { GasForm } from './GasForm.js'
+import { GasSettingsType } from './types/index.js'
 
 const useStyles = makeStyles()((theme) => {
     return {
         root: {},
-        paper: {
-            boxShadow: `0px 0px 20px 0px ${theme.palette.mode === 'dark' ? '#FFFFFF1F' : '#0000000D'}`,
-            backdropFilter: 'blur(16px)',
-        },
         tabs: {
             overflow: 'visible',
+            backgroundColor: theme.palette.maskColor.input,
         },
         additions: {
             fontWeight: 700,
@@ -32,20 +26,30 @@ const useStyles = makeStyles()((theme) => {
         label: {
             color: theme.palette.maskColor.second,
             fontWeight: 700,
-            fontSize: 14,
         },
         price: {
             fontWeight: 700,
         },
+        tab: {
+            color: theme.palette.maskColor.second,
+            '&[aria-selected="true"]': {
+                color: theme.palette.maskColor.main,
+            },
+        },
     }
 })
 
-export interface GasSectionProps {}
+interface GasSectionProps {
+    activeTab: GasSettingsType
+    setActiveTab: (type: GasSettingsType) => void
+    disableGasLimit?: boolean
+}
 
 export function GasSection(props: GasSectionProps) {
-    const t = useSharedI18N()
+    const { activeTab, setActiveTab, disableGasLimit } = props
+
+    const t = useSharedTrans()
     const { classes } = useStyles()
-    const [activeTab, setActiveTab] = useState(GasSettingsType.Basic)
     const {
         pluginID,
         chainId,
@@ -56,45 +60,49 @@ export function GasSection(props: GasSectionProps) {
         gasOptionType,
         GAS_OPTION_NAMES,
     } = SettingsContext.useContainer()
+    const [maxPriorityFeePerGasByUser, setMaxPriorityFeePerGasByUser] = useState('0')
 
     // EVM only
     if (pluginID !== NetworkPluginID.PLUGIN_EVM) return null
+
+    const isEIP1559 = EVMUtils.chainResolver.isFeatureSupported(chainId as ChainId, 'EIP1559')
+    const suggestedMaxFeePerGas = gasOptions?.[gasOptionType ?? GasOptionType.NORMAL].suggestedMaxFeePerGas
+    const suggestedMaxPriorityFeePerGas =
+        gasOptions?.[gasOptionType ?? GasOptionType.NORMAL].suggestedMaxPriorityFeePerGas
+    const baseFeePerGas = gasOptions?.[GasOptionType.FAST].baseFeePerGas ?? '0'
+    const priorityFee =
+        !isZero(maxPriorityFeePerGasByUser) ?
+            formatGweiToWei(maxPriorityFeePerGasByUser)
+        :   ((transaction as Transaction)?.maxPriorityFeePerGas as string)
+
+    const gasPrice = (transactionOptions as Transaction | undefined)?.gasPrice
+
+    const customPrice = formatCurrency(
+        activeTab === GasSettingsType.Basic ?
+            formatWeiToGwei(suggestedMaxFeePerGas ?? 0)
+        :   formatWeiToGwei(
+                isEIP1559 ?
+                    plus(baseFeePerGas, priorityFee ?? suggestedMaxPriorityFeePerGas ?? 0)
+                :   gasPrice ?? suggestedMaxFeePerGas ?? 0,
+            ),
+        '',
+    )
 
     return (
         <div className={classes.root}>
             <Section
                 title={t.gas_settings_label_gas_price()}
                 additions={
-                    gasOptionType ? (
+                    gasOptionType ?
                         <Typography className={classes.additions} component="span">
                             <span className={classes.label}>
-                                {activeTab === GasSettingsType.Basic
-                                    ? GAS_OPTION_NAMES[gasOptionType]
-                                    : t.gas_settings_custom()}
+                                {activeTab === GasSettingsType.Basic ?
+                                    GAS_OPTION_NAMES[gasOptionType]
+                                :   t.gas_settings_custom()}
                             </span>
-                            {activeTab === GasSettingsType.Basic ? (
-                                <span className={classes.price}>
-                                    {' '}
-                                    {new BigNumber(
-                                        (gasOptions?.[gasOptionType].suggestedMaxFeePerGas as string | undefined) ?? 0,
-                                    ).toFixed(2)}
-                                    {' Gwei'}
-                                </span>
-                            ) : (
-                                <span className={classes.price}>
-                                    {' '}
-                                    {transactionOptions
-                                        ? formatWeiToGwei(
-                                              ((transactionOptions as Transaction).maxFeePerGas as
-                                                  | string
-                                                  | undefined) ?? 0,
-                                          ).toFixed(2)
-                                        : 0}
-                                    {' Gwei'}
-                                </span>
-                            )}
+                            <span className={classes.price}>{` ${customPrice} Gwei`}</span>
                         </Typography>
-                    ) : null
+                    :   null
                 }>
                 <TabContext value={activeTab}>
                     <MaskTabList
@@ -102,11 +110,15 @@ export function GasSection(props: GasSectionProps) {
                         variant="round"
                         aria-label="Gas Tabs"
                         onChange={(event, tab) => setActiveTab(tab as GasSettingsType)}>
-                        <Tab label={t.gas_settings_tab_basic()} value={GasSettingsType.Basic} />
-                        <Tab label={t.gas_settings_tab_advanced()} value={GasSettingsType.Advanced} />
+                        <Tab className={classes.tab} label={t.gas_settings_tab_basic()} value={GasSettingsType.Basic} />
+                        <Tab
+                            className={classes.tab}
+                            label={t.gas_settings_tab_advanced()}
+                            value={GasSettingsType.Advanced}
+                        />
                     </MaskTabList>
                 </TabContext>
-                {activeTab === GasSettingsType.Basic ? (
+                {activeTab === GasSettingsType.Basic ?
                     <GasOptionSelector
                         chainId={chainId as ChainId}
                         options={gasOptions}
@@ -114,16 +126,21 @@ export function GasSection(props: GasSectionProps) {
                             setTransactionOptions(transactionOptions)
                         }}
                     />
-                ) : transaction && gasOptions ? (
+                : gasOptions ?
                     <GasForm
+                        defaultGasLimit={customPrice}
+                        disableGasLimit={disableGasLimit}
                         chainId={chainId as ChainId}
                         transaction={transaction as Transaction}
+                        transactionOptions={transactionOptions as Partial<Transaction>}
                         gasOptions={gasOptions}
                         onChange={(transactionOptions) => {
-                            setTransactionOptions(transactionOptions ?? null)
+                            setTransactionOptions(transactionOptions)
                         }}
+                        maxPriorityFeePerGasByUser={maxPriorityFeePerGasByUser}
+                        setMaxPriorityFeePerGasByUser={setMaxPriorityFeePerGasByUser}
                     />
-                ) : null}
+                :   null}
             </Section>
         </div>
     )

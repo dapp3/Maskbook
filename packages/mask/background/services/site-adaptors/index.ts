@@ -1,3 +1,12 @@
-export { getDesignatedAutoStartPluginID, openSNSAndActivatePlugin } from './open-with-plugin'
-export { getSupportedSites } from './connect'
-export { openProfilePage, openShareLink } from './open-page'
+export {
+    getSupportedSites,
+    getSupportedOrigins,
+    getOriginsWithoutPermission,
+    getSitesWithoutPermission,
+    getAllOrigins,
+    requestPermissionBySite,
+    setupSite,
+    connectSite,
+    disconnectSite,
+} from './connect.js'
+export { attachMaskSDKToCurrentActivePage, shouldSuggestConnectInPopup } from './sdk.js'

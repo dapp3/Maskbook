@@ -1,8 +1,9 @@
-import { ObservableSet } from '@masknet/shared-base'
+import { noop } from 'lodash-es'
+import { timeout } from '@masknet/kit'
 import { Emitter } from '@servie/events'
-import { noop } from 'lodash-unified'
-import type { Plugin } from '../types'
-import { getPluginDefine, registeredPluginIDs, registeredPlugins } from './store'
+import { BooleanPreference, ObservableSet, type PluginID } from '@masknet/shared-base'
+import { type Plugin } from '../types.js'
+import { getPluginDefine, onNewPluginRegistered, registeredPlugins } from './store.js'
 
 // Plugin state machine
 // not-loaded => loaded
@@ -11,14 +12,18 @@ import { getPluginDefine, registeredPluginIDs, registeredPlugins } from './store
 export function createManager<
     T extends Plugin.Shared.DefinitionDeferred<Context>,
     Context extends Plugin.Shared.SharedContext,
->(selectLoader: (plugin: Plugin.DeferredDefinition) => undefined | Plugin.Loader<T>) {
+    ManagedContext extends keyof Context = never,
+>(
+    selectLoader: (plugin: Plugin.DeferredDefinition) => undefined | Plugin.Loader<T>,
+    getManagedContext: (pluginID: string, signal: AbortSignal) => Pick<Context, ManagedContext>,
+) {
     interface ActivatedPluginInstance {
         instance: T
         controller: AbortController
         context: Context
     }
-    const resolved = new Map<string, T>()
-    const activated = new Map<string, ActivatedPluginInstance>()
+    const resolved = new Map<PluginID, T>()
+    const activated = new Map<PluginID, ActivatedPluginInstance>()
     const minimalModePluginIDs = (() => {
         const value = new ObservableSet<string>()
         value.event.on('add', (id) => id.forEach((id) => events.emit('minimalModeChanged', id, true)))
@@ -28,14 +33,14 @@ export function createManager<
         }
         return value
     })()
-    let _host: Plugin.__Host.Host<Context> = undefined!
+    let _host: Plugin.__Host.Host<T, Omit<Context, ManagedContext>> = undefined!
     const events = new Emitter<{
         activateChanged: [id: string, enabled: boolean]
         minimalModeChanged: [id: string, enabled: boolean]
     }>()
 
     return {
-        configureHostHooks: (host: Plugin.__Host.Host<Context>) => (_host = host),
+        configureHostHooks: (host: Plugin.__Host.Host<T, Omit<Context, ManagedContext>>) => (_host = host),
         activatePlugin,
         stopPlugin,
         isMinimalMode,
@@ -55,29 +60,60 @@ export function createManager<
         events,
     }
 
-    function startDaemon(host: Plugin.__Host.Host<Context>, extraCheck?: (id: string) => boolean) {
+    async function updateCompositedMinimalMode(id: string) {
+        const definition = await __getDefinition(id as PluginID)
+        if (!definition) return
+
+        const settings = await _host.minimalMode.isEnabled(id)
+        let result: boolean
+        if (settings === BooleanPreference.True) result = true
+        else if (settings === BooleanPreference.False) result = false
+        // plugin default minimal mode is false
+        else result = !!definition.inMinimalModeByDefault
+
+        result ? minimalModePluginIDs.add(id) : minimalModePluginIDs.delete(id)
+    }
+
+    function startDaemon(
+        host: Plugin.__Host.Host<T, Omit<Context, ManagedContext>>,
+        extraCheck?: (id: PluginID) => boolean,
+    ) {
         _host = host
-        const { signal, addI18NResource, minimalMode } = _host
-        const removeListener1 = minimalMode.events.on('enabled', (id) => minimalModePluginIDs.add(id))
-        const removeListener2 = minimalMode.events.on('disabled', (id) => minimalModePluginIDs.delete(id))
+        const { signal = new AbortController().signal, addI18NResource, minimalMode } = _host
+        const removeListener1 = minimalMode.events.on('enabled', (id) => updateCompositedMinimalMode(id))
+        const removeListener2 = minimalMode.events.on('disabled', (id) => updateCompositedMinimalMode(id))
+        const removeListener3 = onNewPluginRegistered((id, define) => {
+            define.i18n && addI18NResource(id, define.i18n)
+            checkRequirementAndStartOrStop()
+        })
 
-        signal?.addEventListener('abort', () => [...activated.keys()].forEach(stopPlugin))
-        signal?.addEventListener('abort', () => void [removeListener1(), removeListener2()])
+        signal.addEventListener(
+            'abort',
+            () => {
+                ;[...activated.keys()].forEach(stopPlugin)
+                removeListener1()
+                removeListener2()
+                removeListener3()
+            },
+            { once: true },
+        )
 
-        for (const plugin of registeredPlugins) {
+        for (const [, plugin] of registeredPlugins.getCurrentValue()) {
             plugin.i18n && addI18NResource(plugin.ID, plugin.i18n)
         }
-        checkRequirementAndStartOrStop().catch(console.error)
+        checkRequirementAndStartOrStop().then().catch(console.error)
+
         async function checkRequirementAndStartOrStop() {
-            for (const id of registeredPluginIDs) {
-                if (await meetRequirement(id)) activatePlugin(id).catch(console.error)
+            for (const [id] of registeredPlugins.getCurrentValue()) {
+                if (await meetRequirement(id)) await activatePlugin(id).catch(console.error)
                 else stopPlugin(id)
             }
         }
 
-        async function meetRequirement(id: string) {
+        async function meetRequirement(id: PluginID) {
             const define = getPluginDefine(id)
             if (!define) return false
+
             if (extraCheck && !extraCheck(id)) return false
             return true
         }
@@ -90,15 +126,12 @@ export function createManager<
             )
     }
 
-    async function activatePlugin(id: string) {
+    async function activatePlugin(id: PluginID) {
         if (activated.has(id)) return
         const definition = await __getDefinition(id)
         if (!definition) return
 
-        Promise.resolve(_host.minimalMode.isEnabled(id)).then(
-            (enabled) => (enabled ? minimalModePluginIDs.add(id) : minimalModePluginIDs.delete(id)),
-            noop,
-        )
+        updateCompositedMinimalMode(id).catch(noop)
         if (definition.enableRequirement.target !== 'stable' && !definition.experimentalMark) {
             console.warn(
                 `[@masknet/plugin-infra] Plugin ${id} is not enabled in stable release, expected it's "experimentalMark" to be true.`,
@@ -111,14 +144,26 @@ export function createManager<
         const activatedPlugin: ActivatedPluginInstance = {
             instance: definition,
             controller: abort,
-            context: _host.createContext(id, abort.signal),
+            // Type 'Pick<Context, ManagedContext> & Omit<Context, ManagedContext>' is not assignable to type 'Context'. but it does.
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            context: {
+                ...getManagedContext(id, abort.signal),
+                ..._host.createContext(id, definition, abort.signal),
+            },
         }
         activated.set(id, activatedPlugin)
-        await definition.init(activatedPlugin.controller.signal, activatedPlugin.context)
+        if (definition.init) {
+            await timeout(
+                Promise.resolve(definition.init(activatedPlugin.controller.signal, activatedPlugin.context)),
+                1000,
+                `Plugin ${id} init() timed out.`,
+            ).catch(console.error)
+        }
         events.emit('activateChanged', id, true)
     }
 
-    function stopPlugin(id: string) {
+    function stopPlugin(id: PluginID) {
         const instance = activated.get(id)
         if (!instance) return
         instance.controller.abort()
@@ -126,15 +171,15 @@ export function createManager<
         events.emit('activateChanged', id, false)
     }
 
-    function isActivated(id: string) {
+    function isActivated(id: PluginID) {
         return activated.has(id)
     }
 
-    function isMinimalMode(id: string) {
+    function isMinimalMode(id: PluginID) {
         return minimalModePluginIDs.has(id)
     }
 
-    async function __getDefinition(id: string) {
+    async function __getDefinition(id: PluginID) {
         if (resolved.has(id)) return resolved.get(id)!
 
         const deferredDefinition = getPluginDefine(id)
@@ -157,3 +202,5 @@ export function createManager<
         return definition
     }
 }
+
+createManager.NoManagedContext = () => ({})
